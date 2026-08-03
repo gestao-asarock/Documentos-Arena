@@ -1,0 +1,21 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "venv", "migrations", "staticfiles"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "DJ", "C4"]
+ignore = [
+    # Nomes de campo em português podem coincidir com palavras reservadas do linter
+    "DJ001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/arena/settings.py" = ["E501"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "arena.settings"
+pythonpath = ["src"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-ra --strict-markers"
+testpaths = ["src", "tests"]

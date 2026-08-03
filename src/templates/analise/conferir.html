@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Conferir {{ documento.rotulo }} — Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>{{ documento.rotulo }}</h1>
+  {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+</div>
+
+<section class="cartao">
+  <h2>Arquivos enviados</h2>
+  {% if arquivos %}
+    <ul class="lista-kit">
+      {% for arquivo in arquivos %}
+        <li class="lista-kit__item">
+          <span class="lista-kit__nome">{{ arquivo.nome_original|default:"arquivo" }}</span>
+          <a class="botao botao--discreto" href="{% url 'analise:baixar_arquivo' arquivo.pk %}" target="_blank">
+            Abrir
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="aviso aviso--atencao">
+      &#9888; Este registro não tem arquivo algum. Rejeite e peça reenvio.
+    </p>
+  {% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Dados declarados no formulário</h2>
+  <p class="ajuda">
+    Compare com o que está no documento. Divergência de conteúdo é motivo de rejeição;
+    diferença de formatação, não.
+  </p>
+  <dl class="dados">
+    {% for rotulo, valor in declarados %}
+      <div><dt>{{ rotulo }}</dt><dd>{{ valor }}</dd></div>
+    {% endfor %}
+    {% if documento.data_emissao %}
+      <div><dt>Emissão informada</dt><dd>{{ documento.data_emissao|data_br }}</dd></div>
+    {% endif %}
+    {% if documento.data_vencimento %}
+      <div>
+        <dt>Vence em</dt>
+        <dd>
+          {{ documento.data_vencimento|data_br }}
+          {% if documento.esta_vencido %}
+            <span class="estado estado--reprovado">&#10007; vencido</span>
+          {% endif %}
+        </dd>
+      </div>
+    {% endif %}
+  </dl>
+
+  {% if solicitacao %}
+    <p class="ajuda">
+      Solicitação
+      <a href="{% url 'solicitacoes:detalhe' solicitacao.pk %}">#{{ solicitacao.pk }}</a>
+      — {{ solicitacao.descricao }}, {{ solicitacao.valor|moeda }}.
+    </p>
+  {% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Decisão</h2>
+  <p class="ajuda">
+    A análise por IA ainda não está ligada: por ora a conferência é visual. Quando entrar,
+    os dados extraídos e as evidências aparecem aqui — a decisão continua sendo sua.
+  </p>
+
+  <form method="post" action="{% url 'analise:decidir' documento.pk %}" class="formulario">
+    {% csrf_token %}
+    <div class="campo">
+      <label for="observacao">Observação / motivo</label>
+      <textarea id="observacao" name="observacao" rows="3"
+                placeholder="Obrigatório ao rejeitar. O Clube vê este texto para corrigir."></textarea>
+    </div>
+    <div class="acoes">
+      <button type="submit" name="acao" value="aprovar" class="botao botao--grande">Aprovar</button>
+      <button type="submit" name="acao" value="rejeitar" class="botao botao--perigo botao--grande">
+        Rejeitar
+      </button>
+      <a class="botao botao--discreto botao--grande" href="{% url 'analise:fila' %}">Voltar à fila</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

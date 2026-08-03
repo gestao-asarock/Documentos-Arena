@@ -1,0 +1,16 @@
+{% comment %}
+Exclusão de documento enviado por engano.
+
+Documento aprovado não aparece com botão: ele já sustentou uma decisão
+(AGENTS.md §6). A exclusão fica registrada na auditoria.
+{% endcomment %}
+{% if documento.status != "aprovado" %}
+  <form method="post" action="{% url 'solicitacoes:excluir_documento' solicitacao.pk documento.pk %}"
+        class="acao-inline"
+        data-confirmar="Excluir “{{ documento.rotulo }}” e seus arquivos? Esta ação não pode ser desfeita.">
+    {% csrf_token %}
+    <button type="submit" class="botao botao--texto-perigo" title="Excluir documento">
+      Excluir
+    </button>
+  </form>
+{% endif %}

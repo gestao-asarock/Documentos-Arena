@@ -1,0 +1,23 @@
+{% comment %}
+Cancelamento com motivo obrigatório. Espera `url_cancelar` e `rotulo`.
+
+Cancelar não apaga: o registro fica, com motivo e autor (AGENTS.md §6).
+{% endcomment %}
+<section class="cartao">
+  <h2>Cancelar {{ rotulo }}</h2>
+  <p class="ajuda">
+    O registro continua existindo, marcado como cancelado, com o motivo e quem cancelou.
+  </p>
+  <form method="post" action="{{ url_cancelar }}" class="formulario"
+        data-confirmar="Cancelar {{ rotulo }}? O fluxo será encerrado.">
+    {% csrf_token %}
+    <div class="campo">
+      <label for="motivo-cancelamento">Motivo do cancelamento</label>
+      <textarea id="motivo-cancelamento" name="motivo" rows="2"
+                placeholder="Ex.: evento desmarcado pelo contratante."></textarea>
+    </div>
+    <div class="acoes">
+      <button type="submit" class="botao botao--perigo">Cancelar {{ rotulo }}</button>
+    </div>
+  </form>
+</section>

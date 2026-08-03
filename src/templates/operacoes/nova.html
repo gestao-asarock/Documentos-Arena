@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block titulo %}Novo contrato — Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo"><h1>Novo contrato</h1></div>
+
+{% if not tem_solicitacoes %}
+  <section class="cartao cartao--estreito">
+    <p class="aviso aviso--atencao">
+      &#9888; Nenhuma solicitação pronta para contrato.
+    </p>
+    <p class="ajuda">
+      O contrato só começa depois que a contraparte é habilitada: kit cadastral conferido,
+      due diligence e análise de crédito concluídas.
+    </p>
+    <p>
+      <a class="botao botao--discreto" href="{% url 'solicitacoes:lista' %}">Ver solicitações</a>
+    </p>
+  </section>
+{% else %}
+  <section class="cartao cartao--estreito">
+    {% if form.non_field_errors %}
+      <p class="aviso aviso--erro">{{ form.non_field_errors|join:" " }}</p>
+    {% endif %}
+
+    <form method="post" class="formulario">
+      {% csrf_token %}
+      {% for campo in form %}
+        <div class="campo{% if campo.errors %} campo--erro{% endif %}">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+          {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
+        </div>
+      {% endfor %}
+
+      <p class="ajuda">
+        Contraparte, tipo e valor vêm da solicitação — foram eles que passaram pela
+        habilitação e não se redigitam aqui.
+      </p>
+
+      <div class="acoes">
+        <button type="submit" class="botao botao--grande">Criar contrato</button>
+        <a class="botao botao--discreto botao--grande" href="{% url 'operacoes:lista' %}">Cancelar</a>
+      </div>
+    </form>
+  </section>
+{% endif %}
+{% endblock %}

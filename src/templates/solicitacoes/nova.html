@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load dicionario %}
+
+{% block titulo %}Nova solicitação — Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo"><h1>Nova solicitação</h1></div>
+
+<section class="cartao cartao--estreito">
+  {% if form.non_field_errors %}
+    <p class="aviso aviso--erro">{{ form.non_field_errors|join:" " }}</p>
+  {% endif %}
+
+  <form method="post" class="formulario" data-url-cep="{% url 'solicitacoes:buscar_cep' %}">
+    {% csrf_token %}
+
+    <h2 class="secao-formulario secao-formulario--primeira">Evento ou serviço</h2>
+    {% for campo in form %}
+      {% if campo.name in form.BLOCOS %}
+        <h2 class="secao-formulario">{{ form.BLOCOS|get:campo.name }}</h2>
+      {% endif %}
+      <div class="campo{% if campo.errors %} campo--erro{% endif %}">
+        <label for="{{ campo.id_for_label }}">
+          {{ campo.label }}{% if campo.field.required %} <span class="obrigatorio">*</span>{% endif %}
+        </label>
+        {{ campo }}
+        {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+        {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
+      </div>
+    {% endfor %}
+
+    <p class="ajuda">
+      Os documentos exigidos são definidos automaticamente pelo CPF/CNPJ informado e pelo valor.
+    </p>
+
+    <div class="acoes">
+      <button type="submit" class="botao botao--grande">Registrar solicitação</button>
+      <a class="botao botao--discreto botao--grande" href="{% url 'solicitacoes:lista' %}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

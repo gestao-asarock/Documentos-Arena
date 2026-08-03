@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Crédito — {{ contraparte.nome }}{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>{{ contraparte.nome }}</h1>
+  {% include "operacoes/_situacao.html" with status=habilitacao.status rotulo=habilitacao.get_status_display %}
+</div>
+
+<section class="cartao">
+  <h2>Contraparte</h2>
+  <dl class="dados">
+    <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento }}</dd></div>
+    <div><dt>Tipo</dt><dd>{{ contraparte.get_tipo_pessoa_display }}</dd></div>
+    {% if solicitacao %}
+      <div><dt>Operação</dt><dd>{{ solicitacao.descricao }}</dd></div>
+      <div><dt>Valor</dt><dd>{{ solicitacao.valor|moeda }}</dd></div>
+    {% endif %}
+  </dl>
+
+  {% if parecer_compliance.esta_concluido %}
+    <p class="ajuda">
+      <strong>Compliance:</strong> {{ parecer_compliance.get_veredito_display }} —
+      {{ parecer_compliance.justificativa }}
+    </p>
+  {% endif %}
+</section>
+
+{% if parecer.esta_concluido %}
+  <section class="cartao">
+    <h2>Parecer concluído</h2>
+    <p>
+      <strong>{{ parecer.get_veredito_display }}</strong> — por {{ parecer.analista|default:"—" }}
+      em {{ parecer.data_conclusao|data_hora_br }}.
+    </p>
+    <p>{{ parecer.justificativa }}</p>
+    <dl class="dados">
+      {% for rotulo, texto in parecer.blocos_preenchidos %}
+        <div><dt>{{ rotulo }}</dt><dd>{{ texto|linebreaksbr }}</dd></div>
+      {% endfor %}
+    </dl>
+  </section>
+{% else %}
+  <form method="post" class="formulario">
+    {% csrf_token %}
+
+    <section class="cartao">
+      <h2>Verificações</h2>
+      <p class="ajuda">
+        Bloco que não se aplica pode ficar em branco — balanço e DRE não valem para
+        pessoa física.
+      </p>
+      {% for campo in form.campos_dos_blocos %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+        </div>
+      {% endfor %}
+    </section>
+
+    <section class="cartao">
+      <h2>Conclusão</h2>
+      {% for campo in form.campos_da_conclusao %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+          {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
+        </div>
+      {% endfor %}
+
+      {% if parecer.blocos_em_branco %}
+        <p class="aviso aviso--atencao">
+          &#9888; Sem registro em: {{ parecer.blocos_em_branco|join:", " }}.
+          Confirme que não se aplicam antes de concluir.
+        </p>
+      {% endif %}
+
+      <p class="ajuda">
+        Concluir aqui <strong>habilita a contraparte</strong>: é a última etapa antes do contrato.
+      </p>
+
+      <div class="acoes">
+        <button type="submit" name="acao" value="salvar" class="botao botao--discreto botao--grande">
+          Salvar rascunho
+        </button>
+        <button type="submit" name="acao" value="concluir" class="botao botao--grande">
+          Concluir e habilitar
+        </button>
+      </div>
+    </section>
+  </form>
+
+  <section class="cartao">
+    <h2>Evidências</h2>
+    <ul class="lista-kit">
+      {% for evidencia in parecer.evidencias.all %}
+        <li class="lista-kit__item">
+          <span class="estado estado--neutro">{{ evidencia.get_bloco_display }}</span>
+          <span class="lista-kit__nome">
+            {{ evidencia.nome_original }}
+            {% if evidencia.descricao %}<small class="ajuda">{{ evidencia.descricao }}</small>{% endif %}
+          </span>
+        </li>
+      {% empty %}
+        <li class="vazio">Nenhuma evidência anexada.</li>
+      {% endfor %}
+    </ul>
+
+    <form method="post" action="{% url 'credito:anexar_evidencia' habilitacao.pk %}"
+          enctype="multipart/form-data" class="formulario">
+      {% csrf_token %}
+      {% for campo in form_evidencia %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="acoes"><button type="submit" class="botao">Anexar evidência</button></div>
+    </form>
+  </section>
+
+  <section class="cartao">
+    <h2>Recusar contraparte</h2>
+    <form method="post" action="{% url 'credito:recusar' habilitacao.pk %}" class="formulario"
+          data-confirmar="Recusar esta contraparte? O fluxo será encerrado.">
+      {% csrf_token %}
+      <div class="campo">
+        <label for="motivo">Motivo da recusa</label>
+        <textarea id="motivo" name="motivo" rows="2"></textarea>
+      </div>
+      <div class="acoes">
+        <button type="submit" class="botao botao--perigo">Recusar contraparte</button>
+      </div>
+    </form>
+  </section>
+{% endif %}
+
+<p><a class="botao botao--discreto" href="{% url 'credito:fila' %}">Voltar à fila</a></p>
+{% endblock %}

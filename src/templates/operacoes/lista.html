@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Operações — Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>Operações</h1>
+  <span class="contador">{{ operacoes|length }} registro{{ operacoes|length|pluralize:",s" }}</span>
+  {% if pode_criar %}
+    <a class="botao" href="{% url 'operacoes:nova' %}">Nova operação</a>
+  {% endif %}
+</div>
+
+{% if operacoes %}
+  <table class="tabela">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Contraparte</th>
+        <th>Tipo</th>
+        <th class="tabela__numero">Valor</th>
+        <th>Enquadramento</th>
+        <th>Situação</th>
+        <th>Etapa atual</th>
+        <th>Criada em</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for operacao in operacoes %}
+        <tr data-href="{% url 'operacoes:detalhe' operacao.pk %}" class="linha-clicavel">
+          <td>{{ operacao.pk }}</td>
+          <td><a href="{% url 'operacoes:detalhe' operacao.pk %}">{{ operacao.contraparte.nome }}</a></td>
+          <td>{{ operacao.tipo_operacao }}</td>
+          <td class="tabela__numero">{{ operacao.valor_total|moeda }}</td>
+          <td>{{ operacao.regra.criterio|default:"—" }}</td>
+          <td>{% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}</td>
+          <td>{{ operacao.etapa_atual.get_etapa_display|default:"—" }}</td>
+          <td>{{ operacao.data_criacao|data_br }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vazio">Nenhuma operação cadastrada ainda.</p>
+{% endif %}
+{% endblock %}

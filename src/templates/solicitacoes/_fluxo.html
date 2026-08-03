@@ -1,0 +1,18 @@
+{% comment %}
+Linha do tempo do fluxo (AGENTS.md §4.10): o que passou, onde está, o que falta.
+Estado nunca depende só de cor — o símbolo acompanha.
+{% endcomment %}
+<ol class="fluxo">
+  {% for etapa in fluxo %}
+    <li class="fluxo__item fluxo__item--{{ etapa.situacao }}">
+      <span class="fluxo__marca">
+        {% if etapa.situacao == "concluida" %}&#10003;
+        {% elif etapa.situacao == "atual" %}&#9679;
+        {% elif etapa.situacao == "travada" %}&#9888;
+        {% else %}&#9675;{% endif %}
+      </span>
+      <span class="fluxo__rotulo">{{ etapa.rotulo }}</span>
+      {% if etapa.detalhe %}<small class="fluxo__detalhe">{{ etapa.detalhe }}</small>{% endif %}
+    </li>
+  {% endfor %}
+</ol>

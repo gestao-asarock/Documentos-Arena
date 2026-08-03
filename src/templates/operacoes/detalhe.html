@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Operação #{{ operacao.pk }} — Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>Operação #{{ operacao.pk }}</h1>
+  {% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}
+</div>
+
+<section class="cartao">
+  <dl class="dados">
+    <div><dt>Contraparte</dt><dd>{{ operacao.contraparte.nome }}</dd></div>
+    <div><dt>CPF/CNPJ</dt><dd>{{ operacao.contraparte.documento }}</dd></div>
+    <div><dt>Tipo</dt><dd>{{ operacao.tipo_operacao }}</dd></div>
+    <div><dt>Valor</dt><dd>{{ operacao.valor_total|moeda }}</dd></div>
+    <div><dt>Enquadramento</dt><dd>{{ operacao.regra.criterio|default:"não enquadrada" }}</dd></div>
+    <div><dt>Criada em</dt><dd>{{ operacao.data_criacao|data_hora_br }}</dd></div>
+  </dl>
+
+  {% if operacao.contraparte.parte_relacionada %}
+    <p class="aviso aviso--atencao">
+      &#9888; Contraparte marcada como <strong>parte relacionada</strong>.
+      Governança específica em discussão — não altera a alçada.
+    </p>
+  {% endif %}
+
+  <p class="descricao">{{ operacao.descricao }}</p>
+
+  {% if operacao.motivo_reprovacao %}
+    <p class="aviso aviso--erro"><strong>Motivo da reprovação:</strong> {{ operacao.motivo_reprovacao }}</p>
+  {% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Etapas de aprovação</h2>
+  {% if etapas %}
+    <table class="tabela">
+      <thead>
+        <tr><th>Etapa</th><th>Responsável</th><th>Situação</th><th>Decidida por</th><th>Parecer</th></tr>
+      </thead>
+      <tbody>
+        {% for etapa in etapas %}
+          <tr>
+            <td>{{ etapa.get_etapa_display }}</td>
+            <td>{{ etapa.papel_responsavel }}</td>
+            <td>{% include "operacoes/_situacao.html" with status=etapa.status rotulo=etapa.get_status_display %}</td>
+            <td>{{ etapa.decidida_por|default:"—" }}</td>
+            <td>{{ etapa.parecer|default:"—" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="vazio">Operação sem etapas: em rascunho ou dispensada por waiver.</p>
+  {% endif %}
+
+  {% if etapa_atual and not operacao.esta_encerrada %}
+    <div class="decisao">
+      <h3 class="subtitulo">Decidir: {{ etapa_atual.get_etapa_display }}</h3>
+      {% if pode_decidir %}
+        <form method="post" action="{% url 'operacoes:decidir' operacao.pk etapa_atual.pk %}" class="formulario">
+          {% csrf_token %}
+          <label for="{{ form_decisao.parecer.id_for_label }}">{{ form_decisao.parecer.label }}</label>
+          {{ form_decisao.parecer }}
+          <small class="ajuda">{{ form_decisao.parecer.help_text }}</small>
+          <div class="acoes">
+            <button type="submit" name="acao" value="aprovar" class="botao">Aprovar</button>
+            <button type="submit" name="acao" value="reprovar" class="botao botao--perigo">Reprovar</button>
+          </div>
+        </form>
+      {% else %}
+        <p class="vazio">
+          Etapa sob responsabilidade de <strong>{{ etapa_atual.papel_responsavel }}</strong>.
+          Você não tem papel para decidi-la.
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Documentação exigida</h2>
+
+  <h3 class="subtitulo">Kit Cadastral PJ <small>(da contraparte, reaproveitado entre operações)</small></h3>
+  {% if pendencias_cadastrais %}
+    <ul class="lista-pendencias">
+      {% for tipo in pendencias_cadastrais %}
+        <li><span class="estado estado--pendente">&#9679;</span> {{ tipo.nome }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">
+      {% if operacao.contraparte.eh_pj %}
+        &#10003; Dossiê cadastral completo e vigente.
+      {% else %}
+        Contraparte pessoa física: exigência definida pelo enquadramento.
+      {% endif %}
+    </p>
+  {% endif %}
+
+  <h3 class="subtitulo">Desta operação</h3>
+  {% if documentos_exigidos %}
+    <ul class="lista-pendencias">
+      {% for tipo in documentos_exigidos %}<li>{{ tipo.nome }}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma exigência específica.</p>
+  {% endif %}
+</section>
+
+{% if operacao.status == "cancelada" %}
+  <section class="cartao">
+    <p class="aviso aviso--erro">
+      &#10007; <strong>Operação cancelada</strong> por {{ operacao.cancelada_por|default:"—" }}
+      em {{ operacao.data_cancelamento|data_hora_br }}.
+      {% if operacao.motivo_cancelamento %}<br>Motivo: {{ operacao.motivo_cancelamento }}{% endif %}
+    </p>
+  </section>
+{% elif pode_cancelar %}
+  {% url 'operacoes:cancelar' operacao.pk as url_cancelar %}
+  {% include "_cancelar.html" with url_cancelar=url_cancelar rotulo="operação" %}
+{% endif %}
+
+<p><a class="botao botao--discreto" href="{% url 'operacoes:lista' %}">Voltar</a></p>
+{% endblock %}

@@ -1,0 +1,38 @@
+# Ambiente
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Django
+*.log
+db.sqlite3
+/staticfiles/
+/mediafiles/
+
+# Documentos — NUNCA commitar arquivo de documento (AGENTS.md §6)
+/uploads/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+!static/**/*.png
+!static/**/*.jpg
+!docs/**/*.png
+
+# IDE / SO
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

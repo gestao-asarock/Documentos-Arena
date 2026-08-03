@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Due diligence — {{ contraparte.nome }}{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>{{ contraparte.nome }}</h1>
+  {% include "operacoes/_situacao.html" with status=habilitacao.status rotulo=habilitacao.get_status_display %}
+</div>
+
+<section class="cartao">
+  <h2>Contraparte</h2>
+  <dl class="dados">
+    <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento }}</dd></div>
+    <div><dt>Tipo</dt><dd>{{ contraparte.get_tipo_pessoa_display }}</dd></div>
+    {% if contraparte.data_nascimento %}
+      <div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>
+    {% endif %}
+    {% if contraparte.endereco %}<div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>{% endif %}
+    {% if solicitacao %}
+      <div><dt>Operação</dt><dd>{{ solicitacao.descricao }} — {{ solicitacao.valor|moeda }}</dd></div>
+    {% endif %}
+  </dl>
+
+  {% if contraparte.parte_relacionada %}
+    <p class="aviso aviso--atencao">
+      &#9888; Marcada como <strong>parte relacionada</strong>. Governança específica
+      ainda em discussão — registre a análise no bloco correspondente.
+    </p>
+  {% endif %}
+</section>
+
+<section class="cartao">
+  <h2>Documentos do dossiê</h2>
+  <ul class="lista-kit">
+    {% for documento in documentos %}
+      <li class="lista-kit__item">
+        {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+        <span class="lista-kit__nome">{{ documento.rotulo }}</span>
+        {% for arquivo in documento.arquivos.all %}
+          <a class="botao botao--discreto" href="{% url 'analise:baixar_arquivo' arquivo.pk %}" target="_blank">
+            {{ arquivo.nome_original|default:"arquivo" }}
+          </a>
+        {% endfor %}
+      </li>
+    {% empty %}
+      <li class="vazio">Sem documentos.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if parecer.esta_concluido %}
+  <section class="cartao">
+    <h2>Parecer concluído</h2>
+    <p>
+      <strong>{{ parecer.get_veredito_display }}</strong> — por {{ parecer.analista|default:"—" }}
+      em {{ parecer.data_conclusao|data_hora_br }}.
+    </p>
+    <p>{{ parecer.justificativa }}</p>
+    <dl class="dados">
+      {% for rotulo, texto in parecer.blocos_preenchidos %}
+        <div><dt>{{ rotulo }}</dt><dd>{{ texto|linebreaksbr }}</dd></div>
+      {% endfor %}
+    </dl>
+  </section>
+{% else %}
+  <form method="post" class="formulario">
+    {% csrf_token %}
+
+    <section class="cartao">
+      <h2>Verificações</h2>
+      <p class="ajuda">
+        Registre o que encontrou em cada fonte. Bloco que não se aplica pode ficar em branco —
+        sócios e beneficiário final não valem para pessoa física.
+      </p>
+      {% for campo in form.campos_dos_blocos %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+        </div>
+      {% endfor %}
+    </section>
+
+    <section class="cartao">
+      <h2>Conclusão</h2>
+      {% for campo in form.campos_da_conclusao %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+          {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
+        </div>
+      {% endfor %}
+
+      {% if parecer.blocos_em_branco %}
+        <p class="aviso aviso--atencao">
+          &#9888; Sem registro em: {{ parecer.blocos_em_branco|join:", " }}.
+          Confirme que não se aplicam antes de concluir.
+        </p>
+      {% endif %}
+
+      <div class="acoes">
+        <button type="submit" name="acao" value="salvar" class="botao botao--discreto botao--grande">
+          Salvar rascunho
+        </button>
+        <button type="submit" name="acao" value="concluir" class="botao botao--grande">
+          Concluir due diligence
+        </button>
+      </div>
+    </section>
+  </form>
+
+  <section class="cartao">
+    <h2>Evidências</h2>
+    <ul class="lista-kit">
+      {% for evidencia in parecer.evidencias.all %}
+        <li class="lista-kit__item">
+          <span class="estado estado--neutro">{{ evidencia.get_bloco_display }}</span>
+          <span class="lista-kit__nome">
+            {{ evidencia.nome_original }}
+            {% if evidencia.descricao %}<small class="ajuda">{{ evidencia.descricao }}</small>{% endif %}
+          </span>
+        </li>
+      {% empty %}
+        <li class="vazio">Nenhuma evidência anexada.</li>
+      {% endfor %}
+    </ul>
+
+    <form method="post" action="{% url 'compliance:anexar_evidencia' habilitacao.pk %}"
+          enctype="multipart/form-data" class="formulario">
+      {% csrf_token %}
+      {% for campo in form_evidencia %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="acoes"><button type="submit" class="botao">Anexar evidência</button></div>
+    </form>
+  </section>
+
+  <section class="cartao">
+    <h2>Recusar contraparte</h2>
+    <p class="ajuda">
+      Encerra a habilitação. A contratação não acontece e o fluxo para aqui.
+    </p>
+    <form method="post" action="{% url 'compliance:recusar' habilitacao.pk %}" class="formulario"
+          data-confirmar="Recusar esta contraparte? O fluxo será encerrado.">
+      {% csrf_token %}
+      <div class="campo">
+        <label for="motivo">Motivo da recusa</label>
+        <textarea id="motivo" name="motivo" rows="2"></textarea>
+      </div>
+      <div class="acoes">
+        <button type="submit" class="botao botao--perigo">Recusar contraparte</button>
+      </div>
+    </form>
+  </section>
+{% endif %}
+
+<p><a class="botao botao--discreto" href="{% url 'compliance:fila' %}">Voltar à fila</a></p>
+{% endblock %}

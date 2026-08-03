@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Risco e crédito — Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>Fila de risco e crédito</h1>
+  <span class="contador">{{ habilitacoes|length }} contraparte{{ habilitacoes|length|pluralize:",s" }}</span>
+</div>
+
+<p class="ajuda">
+  Só aparecem aqui contrapartes já aprovadas no compliance, e apenas nos enquadramentos
+  em que a matriz do guia exige Risco/Crédito.
+</p>
+
+{% if habilitacoes %}
+  <table class="tabela">
+    <thead>
+      <tr>
+        <th>Contraparte</th>
+        <th>CPF/CNPJ</th>
+        <th>Tipo</th>
+        <th>Compliance</th>
+        <th>Na fila desde</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for habilitacao in habilitacoes %}
+        <tr data-href="{% url 'credito:parecer' habilitacao.pk %}" class="linha-clicavel">
+          <td>
+            <a href="{% url 'credito:parecer' habilitacao.pk %}">{{ habilitacao.contraparte.nome }}</a>
+          </td>
+          <td>{{ habilitacao.contraparte.documento }}</td>
+          <td>{{ habilitacao.contraparte.get_tipo_pessoa_display }}</td>
+          <td>
+            {% if habilitacao.parecer_compliance.veredito %}
+              {{ habilitacao.parecer_compliance.get_veredito_display }}
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ habilitacao.data_criacao|data_hora_br }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="vazio">Nenhuma contraparte aguardando análise de crédito.</p>
+{% endif %}
+{% endblock %}

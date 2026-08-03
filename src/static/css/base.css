@@ -1,0 +1,329 @@
+/*
+ * Identidade visual — Documentos Arena (AGENTS.md §8).
+ * Toda cor, espaçamento e tipografia sai daqui. Não escreva valor literal
+ * dentro de componente: use as variáveis.
+ *
+ * Paleta sóbria e institucional da ASAROCK. Cor é reservada para estado.
+ * Não usar as cores do Corinthians — o sistema é da gestora, não do clube.
+ */
+
+:root {
+  /* Neutros — dominam a interface */
+  --cor-fundo: #f7f8fa;
+  --cor-superficie: #ffffff;
+  --cor-borda: #dfe3e8;
+  --cor-selecao: #eef2f7;
+  --cor-texto: #1c2126;
+  --cor-texto-suave: #5b6673;
+
+  /* Marca — usada com parcimônia (cabeçalho, ação primária) */
+  --cor-primaria: #1f3a5f;
+  --cor-primaria-clara: #2d5a8f;
+
+  /* Estados — sempre acompanhados de ícone ou texto, nunca só cor */
+  --cor-pendente: #8a6d1f;
+  --cor-pendente-fundo: #fdf6e3;
+  --cor-aprovado: #1e6b3a;
+  --cor-aprovado-fundo: #eaf6ee;
+  --cor-reprovado: #9b2c2c;
+  --cor-reprovado-fundo: #fdecec;
+
+  /* Espaçamento — escala fixa */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+
+  /* Tipografia — densidade alta, usuário passa o dia na ferramenta */
+  --fonte: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --texto-p: 14px;
+  --texto-pequeno: 12px;
+  --texto-titulo: 20px;
+
+  --raio: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * `hidden` precisa vencer qualquer `display` declarado depois — sem isto,
+ * uma regra como `.campo { display: flex }` reexibe o elemento escondido.
+ */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: var(--fonte);
+  font-size: var(--texto-p);
+  color: var(--cor-texto);
+  background: var(--cor-fundo);
+}
+
+h1 { font-size: var(--texto-titulo); margin: 0; }
+h2 { font-size: 16px; margin: 0 0 var(--esp-3); }
+a { color: var(--cor-primaria); }
+
+/* Cabeçalho ------------------------------------------------------------- */
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-5);
+  padding: var(--esp-3) var(--esp-5);
+  background: var(--cor-primaria);
+  color: #fff;
+}
+.cabecalho__marca { font-weight: 600; color: #fff; text-decoration: none; }
+.cabecalho__nav { display: flex; gap: var(--esp-4); flex: 1; }
+.cabecalho__nav a { color: #fff; text-decoration: none; opacity: 0.85; }
+.cabecalho__nav a:hover { opacity: 1; }
+.cabecalho__usuario { display: flex; align-items: center; gap: var(--esp-3); }
+
+.conteudo { padding: var(--esp-5); max-width: 1200px; margin: 0 auto; }
+
+.pagina__topo {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  margin-bottom: var(--esp-4);
+}
+.contador { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.subtitulo { font-size: var(--texto-p); margin: var(--esp-4) 0 var(--esp-2); }
+.subtitulo small { color: var(--cor-texto-suave); font-weight: 400; }
+.vazio { color: var(--cor-texto-suave); }
+.descricao { white-space: pre-line; }
+
+/* Cartão e tabela — um único estilo, reutilizado ------------------------- */
+
+.cartao {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: var(--esp-4);
+  margin-bottom: var(--esp-4);
+}
+
+.tabela { width: 100%; border-collapse: collapse; }
+.tabela th, .tabela td {
+  padding: var(--esp-2) var(--esp-3);
+  border-bottom: 1px solid var(--cor-borda);
+  text-align: left;
+  vertical-align: top;
+}
+.tabela th {
+  font-size: var(--texto-pequeno);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cor-texto-suave);
+}
+/* Linha clicável: precisa ficar claro que a linha inteira é o alvo. */
+.linha-clicavel {
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+.linha-clicavel:hover {
+  background: var(--cor-selecao);
+  box-shadow: inset 3px 0 0 var(--cor-primaria);
+}
+.linha-clicavel:hover td:first-child { color: var(--cor-primaria); }
+/* O link existe para teclado e "abrir em nova aba", mas não precisa parecer link. */
+.linha-clicavel a { color: inherit; text-decoration: none; font-weight: 500; }
+.linha-clicavel:hover a { color: var(--cor-primaria); }
+.linha-clicavel:focus-within { background: var(--cor-selecao); }
+.tabela__numero { text-align: right; font-variant-numeric: tabular-nums; }
+
+.dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--esp-3); margin: 0; }
+.dados dt { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.dados dd { margin: var(--esp-1) 0 0; }
+
+.lista-pendencias { margin: 0; padding-left: var(--esp-4); }
+.lista-pendencias li { margin-bottom: var(--esp-1); }
+
+/* Estados — símbolo sempre acompanha a cor (AGENTS.md §8) ---------------- */
+
+.estado {
+  display: inline-block;
+  padding: 2px var(--esp-2);
+  border-radius: var(--raio);
+  font-size: var(--texto-pequeno);
+  white-space: nowrap;
+}
+.estado--pendente { color: var(--cor-pendente); background: var(--cor-pendente-fundo); }
+.estado--aprovado { color: var(--cor-aprovado); background: var(--cor-aprovado-fundo); }
+.estado--reprovado { color: var(--cor-reprovado); background: var(--cor-reprovado-fundo); }
+.estado--neutro { color: var(--cor-texto-suave); background: var(--cor-fundo); }
+
+/* Avisos ----------------------------------------------------------------- */
+
+.aviso {
+  padding: var(--esp-3);
+  border-radius: var(--raio);
+  border-left: 3px solid var(--cor-texto-suave);
+  background: var(--cor-superficie);
+}
+.aviso--erro { border-color: var(--cor-reprovado); background: var(--cor-reprovado-fundo); }
+.aviso--atencao { border-color: var(--cor-pendente); background: var(--cor-pendente-fundo); }
+.aviso--success { border-color: var(--cor-aprovado); background: var(--cor-aprovado-fundo); }
+
+/* Botões e formulários --------------------------------------------------- */
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--esp-2) var(--esp-5);
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  background: var(--cor-primaria);
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.botao:hover { background: var(--cor-primaria-clara); }
+.botao:focus-visible { outline: 2px solid var(--cor-primaria); outline-offset: 2px; }
+.botao--grande { min-height: 46px; padding-inline: var(--esp-6); font-size: 15px; }
+.botao--discreto {
+  background: transparent;
+  border-color: var(--cor-borda);
+  color: var(--cor-texto);
+}
+.botao--discreto:hover { background: var(--cor-fundo); }
+
+.formulario { display: flex; flex-direction: column; gap: var(--esp-4); }
+.campo { display: flex; flex-direction: column; gap: var(--esp-1); }
+.formulario label {
+  font-size: var(--texto-p);
+  font-weight: 500;
+  color: var(--cor-texto);
+}
+.obrigatorio { color: var(--cor-reprovado); }
+.formulario input,
+.formulario select,
+.formulario textarea {
+  min-height: 42px;
+  padding: var(--esp-2) var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  font: inherit;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+.formulario input:focus,
+.formulario select:focus,
+.formulario textarea:focus {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: -1px;
+  border-color: var(--cor-primaria);
+}
+.formulario input[type="file"] { padding: var(--esp-2); }
+.campo--erro input, .campo--erro select { border-color: var(--cor-reprovado); }
+.campo--carregando { background-image: linear-gradient(90deg, transparent, var(--cor-fundo)); }
+.formulario textarea, .formulario select {
+  padding: var(--esp-2);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  font: inherit;
+}
+.formulario .botao { margin-top: var(--esp-3); }
+.ajuda { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.erro-campo { color: var(--cor-reprovado); font-size: var(--texto-pequeno); }
+.acoes { display: flex; gap: var(--esp-2); margin-top: var(--esp-3); }
+.acoes .botao { margin-top: 0; }
+.cartao--estreito { max-width: 560px; }
+.decisao { border-top: 1px solid var(--cor-borda); margin-top: var(--esp-4); padding-top: var(--esp-3); }
+.secao-formulario {
+  margin: var(--esp-5) 0 0;
+  padding-bottom: var(--esp-2);
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: 15px;
+}
+.secao-formulario--primeira { margin-top: 0; }
+
+/* Kit cadastral: um item por linha, situação sempre visível ---------------- */
+
+.lista-kit { list-style: none; margin: 0 0 var(--esp-4); padding: 0; }
+.lista-kit__item {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  margin-bottom: var(--esp-2);
+  background: var(--cor-superficie);
+}
+.lista-kit__item .estado { flex: 0 0 auto; min-width: 104px; }
+
+/* Linha do tempo do fluxo (AGENTS.md §4.10) ------------------------------ */
+
+.fluxo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fluxo__item {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--esp-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  border-top: 3px solid var(--cor-borda);
+}
+.fluxo__marca { font-size: 16px; line-height: 1; }
+.fluxo__rotulo { font-weight: 600; }
+.fluxo__detalhe { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+
+.fluxo__item--concluida { border-top-color: var(--cor-aprovado); }
+.fluxo__item--concluida .fluxo__marca { color: var(--cor-aprovado); }
+.fluxo__item--atual { border-top-color: var(--cor-primaria); background: var(--cor-superficie); }
+.fluxo__item--atual .fluxo__marca { color: var(--cor-primaria); }
+.fluxo__item--travada { border-top-color: var(--cor-reprovado); background: var(--cor-reprovado-fundo); }
+.fluxo__item--travada .fluxo__marca { color: var(--cor-reprovado); }
+.fluxo__item--futura { opacity: 0.6; }
+.fluxo__item--futura .fluxo__marca { color: var(--cor-texto-suave); }
+
+.motivo { display: block; color: var(--cor-reprovado); font-size: var(--texto-pequeno); }
+.acao-inline { display: inline; }
+.tabela__acoes { text-align: right; white-space: nowrap; }
+.lista-kit__nome { flex: 1; }
+.botao--texto-perigo {
+  min-height: 32px;
+  padding: var(--esp-1) var(--esp-3);
+  background: transparent;
+  border-color: transparent;
+  color: var(--cor-reprovado);
+  font-size: var(--texto-pequeno);
+}
+.botao--texto-perigo:hover {
+  background: var(--cor-reprovado-fundo);
+  border-color: var(--cor-reprovado);
+}
+.botao--perigo { background: var(--cor-reprovado); }
+.botao--perigo:hover { background: #7f2323; }
+
+/* Login ------------------------------------------------------------------ */
+
+.login {
+  max-width: 340px;
+  margin: 10vh auto;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: var(--esp-6);
+}
+.login__titulo { margin-bottom: var(--esp-1); }
+.login__subtitulo { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); margin-top: 0; }

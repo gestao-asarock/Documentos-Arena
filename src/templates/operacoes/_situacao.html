@@ -1,0 +1,14 @@
+{% comment %}
+Estado nunca depende só de cor: o símbolo acompanha o texto (AGENTS.md §8).
+{% endcomment %}
+{% if status == "aprovada" or status == "concluida" or status == "assinada" %}
+  <span class="estado estado--aprovado">&#10003; {{ rotulo }}</span>
+{% elif status == "reprovada" %}
+  <span class="estado estado--reprovado">&#10007; {{ rotulo }}</span>
+{% elif status == "cumprida_na_habilitacao" %}
+  <span class="estado estado--aprovado">&#10003; {{ rotulo }}</span>
+{% elif status == "dispensada" or status == "registrada_externamente" %}
+  <span class="estado estado--neutro">&#8211; {{ rotulo }}</span>
+{% else %}
+  <span class="estado estado--pendente">&#9679; {{ rotulo }}</span>
+{% endif %}
