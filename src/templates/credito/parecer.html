@@ -6,19 +6,24 @@
 {% block conteudo %}
 <div class="pagina__topo">
   <h1>{{ contraparte.nome }}</h1>
-  {% include "operacoes/_situacao.html" with status=habilitacao.status rotulo=habilitacao.get_status_display %}
+  {% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}
 </div>
 
 <section class="cartao">
-  <h2>Contraparte</h2>
+  <h2>Contrato #{{ operacao.pk }}</h2>
   <dl class="dados">
     <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento }}</dd></div>
-    <div><dt>Tipo</dt><dd>{{ contraparte.get_tipo_pessoa_display }}</dd></div>
-    {% if solicitacao %}
-      <div><dt>Operação</dt><dd>{{ solicitacao.descricao }}</dd></div>
-      <div><dt>Valor</dt><dd>{{ solicitacao.valor|moeda }}</dd></div>
-    {% endif %}
+    <div><dt>Tipo</dt><dd>{{ operacao.tipo_operacao }}</dd></div>
+    <div><dt>Valor</dt><dd>{{ operacao.valor_total|moeda }}</dd></div>
+    <div><dt>Enquadramento</dt><dd>{{ operacao.regra.criterio|default:"—" }}</dd></div>
+    <div><dt>Evento</dt><dd>{{ operacao.descricao }}</dd></div>
   </dl>
+
+  <p class="ajuda">
+    O parecer abaixo vale para <strong>{{ contraparte.nome }}</strong> no enquadramento
+    <strong>{{ operacao.regra.criterio }}</strong> — outros contratos do mesmo tipo e faixa
+    o reaproveitam.
+  </p>
 
   {% if parecer_compliance.esta_concluido %}
     <p class="ajuda">
@@ -79,16 +84,12 @@
         </p>
       {% endif %}
 
-      <p class="ajuda">
-        Concluir aqui <strong>habilita a contraparte</strong>: é a última etapa antes do contrato.
-      </p>
-
       <div class="acoes">
         <button type="submit" name="acao" value="salvar" class="botao botao--discreto botao--grande">
           Salvar rascunho
         </button>
         <button type="submit" name="acao" value="concluir" class="botao botao--grande">
-          Concluir e habilitar
+          Concluir análise
         </button>
       </div>
     </section>
@@ -110,7 +111,7 @@
       {% endfor %}
     </ul>
 
-    <form method="post" action="{% url 'credito:anexar_evidencia' habilitacao.pk %}"
+    <form method="post" action="{% url 'credito:anexar_evidencia' operacao.pk %}"
           enctype="multipart/form-data" class="formulario">
       {% csrf_token %}
       {% for campo in form_evidencia %}
@@ -125,16 +126,19 @@
   </section>
 
   <section class="cartao">
-    <h2>Recusar contraparte</h2>
-    <form method="post" action="{% url 'credito:recusar' habilitacao.pk %}" class="formulario"
-          data-confirmar="Recusar esta contraparte? O fluxo será encerrado.">
+    <h2>Reprovar contrato</h2>
+    <p class="ajuda">
+      Encerra este contrato. O perfil da contraparte continua válido.
+    </p>
+    <form method="post" action="{% url 'credito:recusar' operacao.pk %}" class="formulario"
+          data-confirmar="Reprovar este contrato na análise de crédito?">
       {% csrf_token %}
       <div class="campo">
-        <label for="motivo">Motivo da recusa</label>
+        <label for="motivo">Motivo</label>
         <textarea id="motivo" name="motivo" rows="2"></textarea>
       </div>
       <div class="acoes">
-        <button type="submit" class="botao botao--perigo">Recusar contraparte</button>
+        <button type="submit" class="botao botao--perigo">Reprovar contrato</button>
       </div>
     </form>
   </section>

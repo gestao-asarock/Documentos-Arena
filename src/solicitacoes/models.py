@@ -5,15 +5,11 @@ Solicitação: o formulário que o Clube preenche (AGENTS.md §4.0, Fase 1).
 reaproveita a contraparte e monta a lista de documentos exigidos.
 """
 
-from decimal import Decimal
-
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
 from contrapartes.models import Contraparte, Habilitacao
-from operacoes.models import TipoOperacao
 
 
 class StatusSolicitacao(models.TextChoices):
@@ -82,23 +78,26 @@ class Solicitacao(models.Model):
         return self.status == StatusSolicitacao.CANCELADA
 
     @property
+    def contratos_em_andamento(self):
+        """Contratos da contraparte que ainda não terminaram."""
+        return self.contraparte.operacoes.exclude(
+            status__in=["cancelada", "concluida", "reprovada", "dispensada"]
+        )
+
+    @property
     def pode_ser_cancelada(self) -> bool:
-        """Solicitação com contrato aberto não se cancela: cancele o contrato antes."""
+        """Perfil com contrato em andamento não se cancela: encerre o contrato antes."""
         if self.esta_cancelada:
             return False
-        return not self.operacoes.exclude(status="cancelada").exists()
+        return not self.contratos_em_andamento.exists()
 
     def cancelar(self, motivo: str, *, usuario=None) -> None:
-        """Desiste do pedido. O registro fica, com motivo e autor.
-
-        A habilitação da contraparte **não** é desfeita: ela pertence à
-        contraparte e serve a outros pedidos (AGENTS.md D19).
-        """
+        """Encerra o cadastro do perfil. O registro fica, com motivo e autor."""
         if self.esta_cancelada:
-            raise ValidationError("Esta solicitação já foi cancelada.")
-        if self.operacoes.exclude(status="cancelada").exists():
+            raise ValidationError("Este perfil já foi cancelado.")
+        if self.contratos_em_andamento.exists():
             raise ValidationError(
-                "Existe contrato aberto para esta solicitação. Cancele o contrato primeiro."
+                "Existe contrato em andamento com esta contraparte. Encerre-o primeiro."
             )
         if not motivo.strip():
             raise ValidationError({"motivo_cancelamento": "Informe o motivo do cancelamento."})

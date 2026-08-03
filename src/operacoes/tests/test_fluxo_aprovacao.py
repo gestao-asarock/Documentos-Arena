@@ -23,14 +23,17 @@ def _decidir_ate(operacao, ultima: Etapa, usuario):
     return operacao
 
 
-def test_etapas_da_fase_1_chegam_cumpridas(criar_operacao, regra_piloto, usuario):
-    """O contrato não refaz triagem, due diligence nem crédito (AGENTS.md §4.0)."""
+def test_etapas_do_perfil_chegam_cumpridas(criar_operacao, regra_piloto, usuario):
+    """O contrato não refaz triagem nem due diligence (AGENTS.md D29)."""
     operacao = enquadrar(criar_operacao("3000.00"), usuario=usuario)
 
-    cumpridas = operacao.etapas.filter(status=StatusEtapa.CUMPRIDA_NA_HABILITACAO)
+    cumpridas = {
+        e.etapa for e in operacao.etapas.filter(status=StatusEtapa.CUMPRIDA_NA_HABILITACAO)
+    }
 
-    assert cumpridas.count() == 3
-    assert operacao.etapa_atual.etapa == Etapa.JURIDICO
+    assert cumpridas == {Etapa.TRIAGEM, Etapa.DUE_DILIGENCE}
+    # Crédito depende do valor e é analisado por contrato (D30).
+    assert operacao.etapa_atual.etapa == Etapa.RISCO_CREDITO
 
 
 def test_apos_juridico_a_bola_passa_para_o_clube(criar_operacao, regra_piloto, usuario):

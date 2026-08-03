@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Documentos Arena{% endblock %}</title>
   {# Incremente o ?v= ao editar CSS ou JS: sem isso o navegador serve a versão antiga. #}
-  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=5">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=6">
   {# HTMX entra quando a primeira tela precisar (upload, polling de análise). #}
   {# Baixe htmx.min.js para src/static/js/ — nada de CDN, o servidor é privado. #}
   <script src="{% static 'js/formulario.js' %}?v=5" defer></script>
@@ -16,7 +16,7 @@
     <header class="cabecalho">
       <a class="cabecalho__marca" href="{% url 'operacoes:lista' %}">Documentos Arena</a>
       <nav class="cabecalho__nav">
-        <a href="{% url 'solicitacoes:lista' %}">Solicitações</a>
+        <a href="{% url 'solicitacoes:lista' %}">Perfis</a>
         {% if pode_conferir %}<a href="{% url 'analise:fila' %}">Fila de análise</a>{% endif %}
         {% if pode_analisar_compliance %}<a href="{% url 'compliance:fila' %}">Due diligence</a>{% endif %}
         {% if pode_analisar_credito %}<a href="{% url 'credito:fila' %}">Crédito</a>{% endif %}

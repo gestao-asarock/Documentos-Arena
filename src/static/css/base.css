@@ -20,13 +20,29 @@
   --cor-primaria: #1f3a5f;
   --cor-primaria-clara: #2d5a8f;
 
-  /* Estados — sempre acompanhados de ícone ou texto, nunca só cor */
-  --cor-pendente: #8a6d1f;
-  --cor-pendente-fundo: #fdf6e3;
-  --cor-aprovado: #1e6b3a;
-  --cor-aprovado-fundo: #eaf6ee;
-  --cor-reprovado: #9b2c2c;
-  --cor-reprovado-fundo: #fdecec;
+  /*
+   * Estados — cinco famílias, e nada além delas. O mapa de status → família
+   * está em operacoes/templatetags/situacao.py; aqui só as cores.
+   * Sempre acompanhados de símbolo: cor sozinha não informa.
+   */
+  --cor-sucesso: #1e6b3a;          /* terminou bem, ou já é válido */
+  --cor-sucesso-fundo: #eaf6ee;
+  --cor-erro: #9b2c2c;             /* cancelado, recusado, reprovado */
+  --cor-erro-fundo: #fdecec;
+  --cor-atencao: #8a6d1f;          /* travado, esperando correção */
+  --cor-atencao-fundo: #fdf6e3;
+  --cor-andamento: #1f4e79;        /* em curso, seguindo o fluxo */
+  --cor-andamento-fundo: #eaf1f8;
+  --cor-neutro: #5b6673;           /* não se aplica */
+  --cor-neutro-fundo: #f1f3f5;
+
+  /* Nomes antigos, mantidos enquanto houver uso direto no CSS */
+  --cor-aprovado: var(--cor-sucesso);
+  --cor-aprovado-fundo: var(--cor-sucesso-fundo);
+  --cor-reprovado: var(--cor-erro);
+  --cor-reprovado-fundo: var(--cor-erro-fundo);
+  --cor-pendente: var(--cor-atencao);
+  --cor-pendente-fundo: var(--cor-atencao-fundo);
 
   /* Espaçamento — escala fixa */
   --esp-1: 4px;
@@ -137,6 +153,10 @@ a { color: var(--cor-primaria); }
 .linha-clicavel:hover a { color: var(--cor-primaria); }
 .linha-clicavel:focus-within { background: var(--cor-selecao); }
 .tabela__numero { text-align: right; font-variant-numeric: tabular-nums; }
+/* Conferência: o valor registrado precisa saltar aos olhos para comparar. */
+.tabela--conferencia { margin-bottom: var(--esp-4); }
+.tabela--conferencia td strong { font-size: 15px; }
+.tabela--conferencia input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
 
 .dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--esp-3); margin: 0; }
 .dados dt { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
@@ -152,24 +172,29 @@ a { color: var(--cor-primaria); }
   padding: 2px var(--esp-2);
   border-radius: var(--raio);
   font-size: var(--texto-pequeno);
+  font-weight: 500;
   white-space: nowrap;
 }
-.estado--pendente { color: var(--cor-pendente); background: var(--cor-pendente-fundo); }
-.estado--aprovado { color: var(--cor-aprovado); background: var(--cor-aprovado-fundo); }
-.estado--reprovado { color: var(--cor-reprovado); background: var(--cor-reprovado-fundo); }
-.estado--neutro { color: var(--cor-texto-suave); background: var(--cor-fundo); }
+.estado--sucesso { color: var(--cor-sucesso); background: var(--cor-sucesso-fundo); }
+.estado--erro { color: var(--cor-erro); background: var(--cor-erro-fundo); }
+.estado--atencao { color: var(--cor-atencao); background: var(--cor-atencao-fundo); }
+.estado--andamento { color: var(--cor-andamento); background: var(--cor-andamento-fundo); }
+.estado--neutro { color: var(--cor-neutro); background: var(--cor-neutro-fundo); }
 
 /* Avisos ----------------------------------------------------------------- */
 
+/* Mesmas cinco famílias dos selos, para a mensagem combinar com o estado. */
 .aviso {
   padding: var(--esp-3);
   border-radius: var(--raio);
-  border-left: 3px solid var(--cor-texto-suave);
-  background: var(--cor-superficie);
+  border-left: 3px solid var(--cor-neutro);
+  background: var(--cor-neutro-fundo);
 }
-.aviso--erro { border-color: var(--cor-reprovado); background: var(--cor-reprovado-fundo); }
-.aviso--atencao { border-color: var(--cor-pendente); background: var(--cor-pendente-fundo); }
-.aviso--success { border-color: var(--cor-aprovado); background: var(--cor-aprovado-fundo); }
+.aviso--erro { border-color: var(--cor-erro); background: var(--cor-erro-fundo); }
+.aviso--atencao { border-color: var(--cor-atencao); background: var(--cor-atencao-fundo); }
+.aviso--sucesso,
+.aviso--success { border-color: var(--cor-sucesso); background: var(--cor-sucesso-fundo); }
+.aviso--info { border-color: var(--cor-andamento); background: var(--cor-andamento-fundo); }
 
 /* Botões e formulários --------------------------------------------------- */
 
@@ -287,16 +312,24 @@ a { color: var(--cor-primaria); }
 .fluxo__rotulo { font-weight: 600; }
 .fluxo__detalhe { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
 
-.fluxo__item--concluida { border-top-color: var(--cor-aprovado); }
-.fluxo__item--concluida .fluxo__marca { color: var(--cor-aprovado); }
-.fluxo__item--atual { border-top-color: var(--cor-primaria); background: var(--cor-superficie); }
-.fluxo__item--atual .fluxo__marca { color: var(--cor-primaria); }
-.fluxo__item--travada { border-top-color: var(--cor-reprovado); background: var(--cor-reprovado-fundo); }
-.fluxo__item--travada .fluxo__marca { color: var(--cor-reprovado); }
-.fluxo__item--futura { opacity: 0.6; }
-.fluxo__item--futura .fluxo__marca { color: var(--cor-texto-suave); }
+/* A linha do tempo usa as mesmas famílias: concluída é sucesso, atual é
+   andamento, travada é atenção — e o que falta fica apagado. */
+.fluxo__item--concluida { border-top-color: var(--cor-sucesso); }
+.fluxo__item--concluida .fluxo__marca { color: var(--cor-sucesso); }
+.fluxo__item--atual {
+  border-top-color: var(--cor-andamento);
+  background: var(--cor-andamento-fundo);
+}
+.fluxo__item--atual .fluxo__marca { color: var(--cor-andamento); }
+.fluxo__item--travada {
+  border-top-color: var(--cor-atencao);
+  background: var(--cor-atencao-fundo);
+}
+.fluxo__item--travada .fluxo__marca { color: var(--cor-atencao); }
+.fluxo__item--futura { opacity: 0.55; }
+.fluxo__item--futura .fluxo__marca { color: var(--cor-neutro); }
 
-.motivo { display: block; color: var(--cor-reprovado); font-size: var(--texto-pequeno); }
+.motivo { display: block; color: var(--cor-erro); font-size: var(--texto-pequeno); }
 .acao-inline { display: inline; }
 .tabela__acoes { text-align: right; white-space: nowrap; }
 .lista-kit__nome { flex: 1; }

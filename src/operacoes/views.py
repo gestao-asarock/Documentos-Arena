@@ -12,19 +12,26 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicos import Acao, registrar
+from contrapartes.models import ArquivoDocumento, DocumentoCadastral
 
-from .estados import TransicaoInvalida
-from .forms import DecisaoEtapaForm, OperacaoForm
+from .conferencia import campos_do_contrato
+from .estados import Etapa, TransicaoInvalida
+from .forms import (
+    DecisaoEtapaForm,
+    EnvioDocumentoContratoForm,
+    OperacaoForm,
+    VincularDocumentosForm,
+)
 from .models import EtapaAprovacao, Operacao
 from .permissoes import pode_cancelar, pode_criar_operacao, pode_decidir
 from .servicos import (
     ContraparteNaoHabilitada,
     EnquadramentoAmbiguo,
     EnquadramentoNaoEncontrado,
+    avancar,
     decidir_etapa,
     enquadrar,
     operacoes_visiveis_para,
-    solicitacoes_prontas_para_contrato,
 )
 
 
@@ -46,6 +53,11 @@ def detalhe(request, pk: int):
         operacoes_visiveis_para(request.user).prefetch_related("etapas"), pk=pk
     )
     etapa_atual = operacao.etapa_atual
+    form_envio = EnvioDocumentoContratoForm(operacao=operacao)
+
+    # A revisão jurídica do piloto é conferência de campos: o Termo de Adesão
+    # precisa repetir o que foi registrado aqui (AGENTS.md §4.9).
+    na_revisao_juridica = bool(etapa_atual) and etapa_atual.etapa == Etapa.JURIDICO
 
     return render(
         request,
@@ -54,39 +66,46 @@ def detalhe(request, pk: int):
             "operacao": operacao,
             "etapas": operacao.etapas.all(),
             "etapa_atual": etapa_atual,
-            "pode_decidir": bool(etapa_atual) and pode_decidir(request.user, etapa_atual),
-            "pode_cancelar": operacao.pode_ser_cancelada
-            and pode_cancelar(request.user, operacao),
-            "form_decisao": DecisaoEtapaForm(),
-            # O kit exigido depende do valor: PF acima de R$ 4.000,00 comprova renda.
-            "pendencias_cadastrais": operacao.contraparte.pendencias_cadastrais(
-                operacao.valor_total
+            # Documentação incompleta trava todas as etapas: o fluxo é linear.
+            "documentacao_completa": operacao.documentacao_completa,
+            "pode_decidir": (
+                bool(etapa_atual)
+                and operacao.documentacao_completa
+                and pode_decidir(request.user, etapa_atual)
             ),
+            "pode_cancelar": operacao.pode_ser_cancelada and pode_cancelar(request.user, operacao),
+            "form_decisao": DecisaoEtapaForm(),
+            "conferencia": campos_do_contrato(operacao) if na_revisao_juridica else None,
             "documentos_exigidos": operacao.documentos_exigidos(),
+            "documentos_pendentes": operacao.documentos_pendentes(),
+            "documentos_vinculados": operacao.documentos.select_related("tipo", "subtipo"),
+            "form_documentos": VincularDocumentosForm(operacao=operacao),
+            "form_envio": form_envio,
+            "config_campos": {
+                "subtipo": getattr(form_envio, "tipos_com_subtipo", []),
+                "emissao": getattr(form_envio, "tipos_com_emissao", []),
+            },
         },
     )
 
 
 @login_required
 def nova(request):
-    """Cria o contrato a partir de uma solicitação já habilitada (AGENTS.md §4.0).
-
-    Não existe contrato do nada: a Fase 2 nasce da Fase 1.
-    """
+    """Cria o contrato para uma contraparte de perfil já validado (AGENTS.md D29)."""
     if not pode_criar_operacao(request.user):
         raise PermissionDenied
 
-    solicitacoes = solicitacoes_prontas_para_contrato(request.user)
-    form = OperacaoForm(request.POST or None, solicitacoes=solicitacoes)
+    form = OperacaoForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():
-        solicitacao = form.cleaned_data["solicitacao"]
+        dados = form.cleaned_data
         operacao = Operacao(
-            solicitacao=solicitacao,
-            contraparte=solicitacao.contraparte,
-            tipo_operacao=solicitacao.tipo_operacao,
-            valor_total=solicitacao.valor,
-            descricao=form.cleaned_data["descricao"],
+            contraparte=dados["contraparte"],
+            tipo_operacao=dados["tipo_operacao"],
+            descricao=dados["descricao"],
+            data_evento=dados["data_evento"],
+            horario_evento=dados["horario_evento"],
+            valor_total=dados["valor_total"],
             criada_por=request.user,
         )
         operacao.save()
@@ -96,10 +115,10 @@ def nova(request):
             enquadrar(operacao, usuario=request.user)
         except ContraparteNaoHabilitada as erro:
             operacao.delete()
-            form.add_error("solicitacao", str(erro))
+            form.add_error("contraparte", str(erro))
         except EnquadramentoNaoEncontrado as erro:
             operacao.delete()
-            form.add_error(None, str(erro))
+            form.add_error("valor_total", str(erro))
         except EnquadramentoAmbiguo as erro:
             operacao.delete()
             form.add_error(None, str(erro))
@@ -113,8 +132,77 @@ def nova(request):
     return render(
         request,
         "operacoes/nova.html",
-        {"form": form, "tem_solicitacoes": solicitacoes.exists()},
+        {"form": form, "tem_perfis": form.fields["contraparte"].queryset.exists()},
     )
+
+
+@login_required
+def vincular_documentos(request, pk: int):
+    """Escolhe documentos já validados do perfil para atender às exigências."""
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+    if request.method != "POST":
+        return redirect("operacoes:detalhe", pk=pk)
+
+    form = VincularDocumentosForm(request.POST, operacao=operacao)
+    if form.is_valid():
+        operacao.documentos.set(form.documentos_escolhidos())
+        avancar(operacao)
+        messages.success(request, "Documentos vinculados ao contrato.")
+
+    return redirect("operacoes:detalhe", pk=pk)
+
+
+@login_required
+def enviar_documento(request, pk: int):
+    """Envia documento complementar exigido pelo contrato.
+
+    O arquivo fica no perfil da contraparte e já entra na fila de conferência —
+    é o mesmo caminho dos documentos base (AGENTS.md §4.6, D29).
+    """
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+    if request.method != "POST":
+        return redirect("operacoes:detalhe", pk=pk)
+
+    form = EnvioDocumentoContratoForm(request.POST, request.FILES, operacao=operacao)
+    if not form.is_valid():
+        for erros in form.errors.values():
+            for erro in erros:
+                messages.error(request, erro)
+        return redirect("operacoes:detalhe", pk=pk)
+
+    arquivos = form.cleaned_data["arquivos"]
+    documento = DocumentoCadastral.objects.create(
+        contraparte=operacao.contraparte,
+        tipo=form.cleaned_data["tipo"],
+        subtipo=form.cleaned_data.get("subtipo"),
+        data_emissao=form.cleaned_data["data_emissao"],
+        enviado_por=request.user,
+    )
+    ArquivoDocumento.objects.bulk_create(
+        [
+            ArquivoDocumento(
+                documento=documento,
+                arquivo=arquivo,
+                nome_original=arquivo.name[:255],
+                ordem=ordem,
+            )
+            for ordem, arquivo in enumerate(arquivos)
+        ]
+    )
+    operacao.documentos.add(documento)
+
+    registrar(
+        acao=Acao.ENVIO_DOCUMENTO,
+        descricao=(
+            f"{documento.rotulo} enviado para o contrato #{operacao.pk} "
+            f"e guardado no perfil da contraparte #{operacao.contraparte_id}"
+        ),
+        objeto=documento,
+        usuario=request.user,
+    )
+
+    messages.success(request, f"{documento.rotulo} enviado. Aguardando conferência.")
+    return redirect("operacoes:detalhe", pk=pk)
 
 
 @login_required

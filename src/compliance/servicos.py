@@ -49,11 +49,10 @@ class ParecerIncompleto(Exception):
 
 @transaction.atomic
 def concluir_parecer(parecer: ParecerCompliance, *, usuario) -> Habilitacao:
-    """Fecha a due diligence e valida o perfil.
+    """Fecha a due diligence e manda o perfil para a análise de crédito.
 
-    O veredito é humano e obrigatório: sem ele não há perfil validado
-    (AGENTS.md §4.7). A partir daqui o perfil serve a qualquer contrato futuro,
-    enquanto os documentos estiverem vigentes (D29).
+    O veredito é humano e obrigatório: sem ele o perfil não avança
+    (AGENTS.md §4.7).
     """
     if not parecer.veredito:
         raise ParecerIncompleto("Escolha o veredito de risco para concluir.")
@@ -65,12 +64,10 @@ def concluir_parecer(parecer: ParecerCompliance, *, usuario) -> Habilitacao:
     parecer.data_conclusao = timezone.now()
     parecer.save()
 
-    # O perfil termina aqui: crédito é por contrato, porque depende do valor (D30).
+    # Aprovado no compliance, o perfil segue para a análise de crédito (D30).
     habilitacao = parecer.habilitacao
-    habilitacao.status = StatusHabilitacao.HABILITADA
-    habilitacao.data_conclusao = timezone.now()
+    habilitacao.status = StatusHabilitacao.EM_CREDITO
     habilitacao.save()
-    habilitacao.solicitacoes.update(status="pronta_para_contrato")
 
     registrar(
         acao=Acao.APROVACAO,

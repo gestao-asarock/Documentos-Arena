@@ -382,6 +382,32 @@ vai ser barrado antes (§7, D23).
 
 ### 4.9 Análise contratual (Fase 2, etapas 10 a 12)
 
+**O contrato circula em duas peças** (verificado em contratos reais do fundo, D31):
+
+- **Contrato-mãe** — *Instrumento Particular de Cessão Onerosa de Uso de Espaço*. Modelo
+  base, **igual em todas as operações do mesmo tipo**, sem nenhum dado de cliente: onde
+  entraria a identificação está escrito `[QUALIFICAÇÃO DA PARTE PREVISTA NO TERMO DE
+  ADESÃO]`. Vem em PDF porque não deve ser editado.
+- **Termo de Adesão** — o que muda a cada operação: nome, CPF, RG, endereço, telefone,
+  e-mail, data, horário, valor e vencimento. Vem em DOCX porque é preenchido a cada caso.
+  **É gerado pelo Clube**, não pelo sistema.
+
+As partes são **três**: o Fundo (ARENA FII, representado pela Genial) cede e recebe; o
+Corinthians entra como *interveniente anuente*, na condição de operador da arena; e o
+Cliente é a contraparte.
+
+**A análise jurídica do piloto é conferência de campos**, não leitura de cláusulas: o
+Termo de Adesão precisa repetir exatamente o que foi registrado na operação — nome,
+CPF/CNPJ, RG, endereço, valor, data e horário. Divergência em qualquer um deles muda o
+negócio. O contrato-mãe não é reanalisado a cada operação; ele só é confrontado com o
+modelo quando a contraparte apresenta **documento próprio** em vez do padrão.
+
+Atenção a uma cláusula: **alteração de data implica multa de 50%** do valor. Por isso a
+data é campo de conferência obrigatória, com o alerta na tela.
+
+Os campos conferidos ficam em `operacoes/conferencia.py`, formatados no padrão brasileiro
+— comparar `R$ 1.500,00` com `1500.00` atrapalha justamente quem confere.
+
 O formulário do contrato registra o tipo (os processos do guia) e, obrigatoriamente, se o
 contrato **segue o modelo da base** ou é **documento próprio da contraparte** — comum
 quando o terceiro é uma empresa grande, e é justamente o caso que exige leitura atenta.
@@ -486,6 +512,9 @@ Regras que valem para todas:
 - `FALHA_ANALISE` é estado previsto, não exceção: a IA vai falhar às vezes e o usuário
   precisa poder reenviar.
 - Reprovação em qualquer etapa interrompe o fluxo e exige parecer textual.
+- **Nenhuma etapa é decidida com documentação incompleta.** O fluxo é linear: sem os
+  documentos exigidos enviados **e aprovados**, `decidir_etapa` recusa e diz o que falta.
+  Não basta esconder o botão — analisar o que não existe é o defeito, não o clique.
 
 ---
 
@@ -666,6 +695,21 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   identificáveis são substituídos. **Nenhum documento real é enviado ao Gemini enquanto
   estivermos no free tier** (§5.1). Quem prepara e fornece essa massa é o responsável
   pelo projeto — não invente operações do nada nem presuma quais existem.
+- **D31 — Contrato = modelo base + Termo de Adesão.** O modelo é fixo por tipo de
+  operação; o termo, gerado pelo Clube, carrega os dados do caso. A análise jurídica do
+  piloto confere se o termo reflete a operação (§4.9). O sistema **não gera** o termo.
+- **D29 — Perfil da contraparte separado do contrato.** O cadastro (`Solicitacao`) reúne
+  só o que é da pessoa: identificação, contato, endereço e os **documentos base** por
+  PF/PJ. Nada de evento, data ou valor — esses são do contrato. Validado o perfil, ele
+  serve a **quantos contratos vierem**, enquanto os documentos estiverem vigentes.
+  Documentos complementares exigidos por um enquadramento também ficam guardados no
+  perfil e podem ser reaproveitados em contratos futuros do mesmo tipo.
+- **D30 — Crédito nasce no perfil e é ancorado depois.** A esteira do perfil é
+  documentos → conferência → due diligence → **crédito** → validado; sem crédito o perfil
+  não vira contrato. Essa primeira análise é **da pessoa** (score, restrições, protestos),
+  sem valor de referência. O **primeiro contrato** que a usar ancora o parecer no
+  enquadramento dele; daí em diante, contrato de outro tipo ou de outra faixa exige
+  análise nova, porque um parecer feito para R$ 2.000,00 não sustenta R$ 200.000,00.
 - **D28 — Documento nunca é URL pública.** Download passa por view autenticada, com
   checagem de permissão e registro na auditoria; no S3, redireciona para URL assinada de
   curta duração. Nome no disco é UUID (§5.4).
@@ -792,6 +836,21 @@ O sistema será visto pelo Clube. "Apresentável" aqui significa **coerente**, n
   (pendente, aprovado, reprovado) — o sistema é ferramenta de trabalho, não vitrine.
   **Não use as cores do Corinthians**: é sistema da ASAROCK para gerir o fundo, e imitar a
   identidade do clube confunde de quem é a ferramenta.
+- **Cor de estado vem de um mapa único**, em `operacoes/templatetags/situacao.py`, e são
+  **cinco famílias, nunca mais**:
+
+  | Família | Cor | Quando |
+  |---|---|---|
+  | `sucesso` | verde | terminou bem, ou já é válido (aprovado, concluído, perfil validado) |
+  | `erro` | vermelho | terminou mal (cancelado, recusado, reprovado, falha) |
+  | `atencao` | âmbar | travado esperando correção (pendência, documento vencido) |
+  | `andamento` | azul | em curso, seguindo o fluxo |
+  | `neutro` | cinza | não se aplica (dispensado, registrado externamente) |
+
+  Nunca escreva `estado--<cor>` decidindo a cor no template: use
+  `{% include "operacoes/_situacao.html" %}`. **Status novo entra no mapa** — há teste que
+  falha se algum ficar de fora, porque foi assim que "Perfil validado" e "Cancelado"
+  acabaram com a cor de "em andamento".
 - Estado precisa ser distinguível **sem depender só de cor** (ícone ou texto junto do
   badge). Parte dos usuários não distingue vermelho de verde, e é uma tela de aprovar
   e reprovar.

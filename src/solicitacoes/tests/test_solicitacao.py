@@ -1,11 +1,10 @@
 """
-Fase 1: solicitação, dedução de PF/PJ e abertura da habilitação (AGENTS.md §4.0).
+Cadastro e validação do perfil da contraparte (AGENTS.md §4.0, D19, D29).
 
-A habilitação é da contraparte e é reaproveitada entre contratos (D19).
+O perfil não conhece valor nem evento: por isso serve a vários contratos.
 """
 
 from datetime import timedelta
-from decimal import Decimal
 
 import pytest
 from django.utils import timezone
@@ -18,7 +17,6 @@ from contrapartes.models import (
     StatusHabilitacao,
 )
 from documentos.models import StatusDocumento, TipoPessoa
-from operacoes.models import TipoOperacao
 from solicitacoes.models import Solicitacao, StatusSolicitacao
 from solicitacoes.servicos import abrir_habilitacao, obter_ou_criar_contraparte
 
@@ -31,26 +29,13 @@ def usuario():
 
 
 @pytest.fixture
-def aluguel():
-    return TipoOperacao.objects.get(nome="Aluguel de Espaço")
-
-
-@pytest.fixture
-def criar_solicitacao(usuario, aluguel):
-    def _criar(documento: str, valor: str, **extra) -> Solicitacao:
+def criar_perfil(usuario):
+    def _criar(documento: str, **extra) -> Solicitacao:
         contraparte, _ = obter_ou_criar_contraparte(
             documento=documento,
             dados={"nome": extra.pop("nome", "Contratante Fictício")},
         )
-        return Solicitacao.objects.create(
-            contraparte=contraparte,
-            tipo_operacao=aluguel,
-            descricao="Formatura de balé",
-            data_evento=timezone.localdate() + timedelta(days=30),
-            valor=Decimal(valor),
-            criada_por=usuario,
-            **extra,
-        )
+        return Solicitacao.objects.create(contraparte=contraparte, criada_por=usuario, **extra)
 
     return _criar
 
@@ -79,74 +64,74 @@ def test_contraparte_existente_e_reaproveitada():
     assert contraparte.nome == "Gabriel Fictício"
 
 
-def test_solicitacao_pf_pede_o_kit_de_pessoa_fisica(criar_solicitacao):
-    solicitacao = criar_solicitacao("58974790890", "2000.00")
+def test_kit_do_perfil_pf_nao_depende_de_valor(criar_perfil):
+    """Comprovação de renda é do contrato, não do perfil (AGENTS.md D29)."""
+    perfil = criar_perfil("58974790890")
 
-    nomes = {t.nome for t in solicitacao.pendencias_cadastrais()}
+    nomes = {t.nome for t in perfil.pendencias_cadastrais()}
 
     assert nomes == {
         "Documento de identificação (RG, CPF e/ou CNH)",
         "Comprovante de residência",
     }
-    assert not solicitacao.kit_completo
+    assert "Holerite" not in nomes
+    assert not perfil.kit_completo
 
 
-def test_solicitacao_pf_acima_de_4000_pede_comprovacao_de_renda(criar_solicitacao):
-    """Regra do responsável, não do guia (AGENTS.md D20)."""
-    solicitacao = criar_solicitacao("58974790890", "4000.01")
+def test_kit_do_perfil_pj(criar_perfil):
+    perfil = criar_perfil("00000000000191", nome="Fornecedora Fictícia Ltda")
 
-    nomes = {t.nome for t in solicitacao.pendencias_cadastrais()}
+    nomes = {t.nome for t in perfil.pendencias_cadastrais()}
 
-    assert {"Holerite", "Declaração de Imposto de Renda"} <= nomes
+    assert "Contrato Social / Última Alteração Contratual" in nomes
+    assert "Procuração" not in nomes  # condicional
 
 
-def test_abrir_habilitacao_marca_credito_conforme_a_matriz(criar_solicitacao, usuario):
-    """O piloto exige Risco/Crédito; a habilitação nasce sabendo disso."""
-    solicitacao = criar_solicitacao("58974790890", "2000.00")
+def test_abrir_habilitacao(criar_perfil, usuario):
+    perfil = criar_perfil("58974790890")
 
-    habilitacao = abrir_habilitacao(solicitacao, usuario=usuario)
-    solicitacao.refresh_from_db()
+    habilitacao = abrir_habilitacao(perfil, usuario=usuario)
+    perfil.refresh_from_db()
 
     assert habilitacao.status == StatusHabilitacao.AGUARDANDO_DOCUMENTOS
-    assert habilitacao.exige_credito
-    assert solicitacao.status == StatusSolicitacao.EM_HABILITACAO
+    assert perfil.status == StatusSolicitacao.EM_HABILITACAO
 
 
-def test_habilitacao_vigente_e_reaproveitada(criar_solicitacao, usuario):
-    """Segundo pedido com a mesma contraparte entra direto na Fase 2 (D19)."""
-    primeira = criar_solicitacao("58974790890", "2000.00")
-    habilitacao = abrir_habilitacao(primeira, usuario=usuario)
+def test_perfil_validado_e_reaproveitado(criar_perfil, usuario):
+    """Segundo cadastro da mesma contraparte não refaz a validação (D19)."""
+    primeiro = criar_perfil("58974790890")
+    habilitacao = abrir_habilitacao(primeiro, usuario=usuario)
     habilitacao.status = StatusHabilitacao.HABILITADA
     habilitacao.data_validade = timezone.localdate() + timedelta(days=180)
     habilitacao.save()
 
-    segunda = criar_solicitacao("58974790890", "3000.00")
-    reaproveitada = abrir_habilitacao(segunda, usuario=usuario)
-    segunda.refresh_from_db()
+    segundo = criar_perfil("58974790890")
+    reaproveitada = abrir_habilitacao(segundo, usuario=usuario)
+    segundo.refresh_from_db()
 
     assert reaproveitada == habilitacao
-    assert segunda.status == StatusSolicitacao.PRONTA_PARA_CONTRATO
+    assert segundo.status == StatusSolicitacao.PRONTA_PARA_CONTRATO
     assert habilitacao.contraparte.habilitacoes.count() == 1
 
 
-def test_habilitacao_vencida_nao_e_reaproveitada(criar_solicitacao, usuario):
-    primeira = criar_solicitacao("58974790890", "2000.00")
-    habilitacao = abrir_habilitacao(primeira, usuario=usuario)
+def test_perfil_vencido_nao_e_reaproveitado(criar_perfil, usuario):
+    primeiro = criar_perfil("58974790890")
+    habilitacao = abrir_habilitacao(primeiro, usuario=usuario)
     habilitacao.status = StatusHabilitacao.HABILITADA
     habilitacao.data_validade = timezone.localdate() - timedelta(days=1)
     habilitacao.save()
 
-    segunda = criar_solicitacao("58974790890", "3000.00")
-    nova = abrir_habilitacao(segunda, usuario=usuario)
+    segundo = criar_perfil("58974790890")
+    nova = abrir_habilitacao(segundo, usuario=usuario)
 
     assert nova != habilitacao
     assert nova.status == StatusHabilitacao.AGUARDANDO_DOCUMENTOS
 
 
-def test_contraparte_so_fica_habilitada_com_status_e_prazo(criar_solicitacao, usuario):
-    solicitacao = criar_solicitacao("58974790890", "2000.00")
-    habilitacao = abrir_habilitacao(solicitacao, usuario=usuario)
-    contraparte = solicitacao.contraparte
+def test_contraparte_so_fica_habilitada_com_status(criar_perfil, usuario):
+    perfil = criar_perfil("58974790890")
+    habilitacao = abrir_habilitacao(perfil, usuario=usuario)
+    contraparte = perfil.contraparte
 
     assert not contraparte.esta_habilitada
 
@@ -156,16 +141,16 @@ def test_contraparte_so_fica_habilitada_com_status_e_prazo(criar_solicitacao, us
     assert contraparte.habilitacao_vigente == habilitacao
 
 
-def test_kit_completo_quando_documentos_aprovados(criar_solicitacao):
-    solicitacao = criar_solicitacao("58974790890", "2000.00")
+def test_kit_completo_quando_documentos_aprovados(criar_perfil):
+    perfil = criar_perfil("58974790890")
 
-    for tipo in solicitacao.pendencias_cadastrais():
+    for tipo in perfil.pendencias_cadastrais():
         documento = DocumentoCadastral.objects.create(
-            contraparte=solicitacao.contraparte,
+            contraparte=perfil.contraparte,
             tipo=tipo,
             status=StatusDocumento.APROVADO,
             data_emissao=timezone.localdate(),
         )
         ArquivoDocumento.objects.create(documento=documento, arquivo="cadastral/ficticio.pdf")
 
-    assert solicitacao.kit_completo
+    assert perfil.kit_completo

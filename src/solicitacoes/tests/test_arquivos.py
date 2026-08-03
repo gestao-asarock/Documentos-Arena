@@ -5,8 +5,6 @@ Documento de identidade não pode ser baixável por quem tem a URL: o acesso pas
 por permissão e é auditado.
 """
 
-from decimal import Decimal
-
 import pytest
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -15,7 +13,6 @@ from django.urls import reverse
 from auditoria.models import Acao, EventoAuditoria
 from contas.models import Papel, Usuario
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
-from operacoes.models import TipoOperacao
 from solicitacoes.models import Solicitacao
 from solicitacoes.servicos import obter_ou_criar_contraparte
 
@@ -36,13 +33,7 @@ def solicitacao(usuario_clube):
     contraparte, _ = obter_ou_criar_contraparte(
         documento="58974790890", dados={"nome": "Contratante Fictício"}
     )
-    return Solicitacao.objects.create(
-        contraparte=contraparte,
-        tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
-        descricao="Formatura de balé",
-        valor=Decimal("2000.00"),
-        criada_por=usuario_clube,
-    )
+    return Solicitacao.objects.create(contraparte=contraparte, criada_por=usuario_clube)
 
 
 @pytest.fixture

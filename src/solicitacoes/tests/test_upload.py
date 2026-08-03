@@ -4,8 +4,6 @@ Envio de documentos e validação de arquivo (AGENTS.md §5.4, D18).
 Extensão é sugestão do usuário; o que vale é a assinatura dos primeiros bytes.
 """
 
-from decimal import Decimal
-
 import pytest
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -15,7 +13,6 @@ from django.urls import reverse
 from contas.models import Papel, Usuario
 from contrapartes.models import DocumentoCadastral
 from documentos.validadores import TAMANHO_MAXIMO_BYTES, validar_documento
-from operacoes.models import TipoOperacao
 from solicitacoes.models import Solicitacao
 from solicitacoes.servicos import obter_ou_criar_contraparte
 
@@ -42,30 +39,25 @@ def solicitacao(usuario_clube):
     contraparte, _ = obter_ou_criar_contraparte(
         documento="58974790890", dados={"nome": "Contratante Fictício"}
     )
-    return Solicitacao.objects.create(
-        contraparte=contraparte,
-        tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
-        descricao="Formatura de balé",
-        valor=Decimal("2000.00"),
-        criada_por=usuario_clube,
-    )
+    return Solicitacao.objects.create(contraparte=contraparte, criada_por=usuario_clube)
 
 
 # -- Telas -------------------------------------------------------------------
 
 
-def test_detalhe_renderiza_com_data_de_evento(client, usuario_clube, solicitacao):
-    """`data_evento` é um `date`; os filtros de data precisam aceitá-lo."""
+def test_detalhe_renderiza_com_data_de_nascimento(client, usuario_clube, solicitacao):
+    """`data_nascimento` é um `date`; os filtros de data precisam aceitá-lo."""
     from datetime import date
 
-    solicitacao.data_evento = date(2026, 8, 24)
-    solicitacao.save()
+    contraparte = solicitacao.contraparte
+    contraparte.data_nascimento = date(2007, 11, 30)
+    contraparte.save()
     client.force_login(usuario_clube)
 
     resposta = client.get(reverse("solicitacoes:detalhe", args=[solicitacao.pk]))
 
     assert resposta.status_code == 200
-    assert "24/08/2026" in resposta.content.decode()
+    assert "30/11/2007" in resposta.content.decode()
 
 
 def test_detalhe_mostra_o_kit_pendente(client, usuario_clube, solicitacao):
@@ -117,7 +109,7 @@ def test_lista_renderiza(client, usuario_clube, solicitacao):
     resposta = client.get(reverse("solicitacoes:lista"))
 
     assert resposta.status_code == 200
-    assert "Formatura de balé" in resposta.content.decode()
+    assert "Contratante Fictício" in resposta.content.decode()
 
 
 # -- Validadores -------------------------------------------------------------
@@ -298,7 +290,7 @@ def test_documento_enviado_sai_de_faltando_e_entra_em_analise(client, usuario_cl
         {"tipo": tipo.id, "arquivos": [_arquivo("comprovante.pdf", PDF)]},
     )
 
-    kit = solicitacao.contraparte.situacao_do_kit(solicitacao.valor)
+    kit = solicitacao.contraparte.situacao_do_kit()
 
     assert tipo not in kit["faltando"]
     assert [d.tipo for d in kit["em_analise"]] == [tipo]

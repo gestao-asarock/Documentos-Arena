@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load formatacao %}
 
-{% block titulo %}Solicitação #{{ solicitacao.pk }} — Documentos Arena{% endblock %}
+{% block titulo %}Perfil #{{ solicitacao.pk }} — Documentos Arena{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
-  <h1>Solicitação #{{ solicitacao.pk }}</h1>
+  <h1>Perfil #{{ solicitacao.pk }}</h1>
   {% include "operacoes/_situacao.html" with status=solicitacao.status rotulo=solicitacao.get_status_display %}
 </div>
 
@@ -14,37 +14,31 @@
   {% include "solicitacoes/_fluxo.html" %}
 
   {% if solicitacao.status == "pronta_para_contrato" %}
-    <p class="aviso aviso--success">
-      &#10003; Contraparte habilitada. O contrato já pode ser aberto.
+    <p class="aviso aviso--sucesso">
+      &#10003; Perfil validado. Este perfil serve a quantos contratos forem necessários,
+      enquanto os documentos estiverem vigentes.
     </p>
-    {% if solicitacao.operacoes.exists %}
-      {% for operacao in solicitacao.operacoes.all %}
-        <p>
-          <a class="botao botao--discreto" href="{% url 'operacoes:detalhe' operacao.pk %}">
-            Ver contrato #{{ operacao.pk }}
-          </a>
-        </p>
-      {% endfor %}
-    {% else %}
-      <p><a class="botao" href="{% url 'operacoes:nova' %}">Criar contrato</a></p>
-    {% endif %}
+    <p><a class="botao" href="{% url 'operacoes:nova' %}">Criar contrato</a></p>
+    {% for operacao in contraparte.operacoes.all %}
+      <p>
+        <a class="botao botao--discreto" href="{% url 'operacoes:detalhe' operacao.pk %}">
+          Contrato #{{ operacao.pk }} — {{ operacao.descricao }}
+        </a>
+      </p>
+    {% endfor %}
   {% endif %}
 </section>
 
 <section class="cartao">
-  <h2>Dados informados</h2>
+  <h2>Dados do perfil</h2>
   <dl class="dados">
-    <div><dt>Evento / serviço</dt><dd>{{ solicitacao.descricao }}</dd></div>
-    <div><dt>Tipo</dt><dd>{{ solicitacao.tipo_operacao }}</dd></div>
-    <div><dt>Data</dt><dd>{{ solicitacao.data_evento|data_br }}{% if solicitacao.horario_evento %} às {{ solicitacao.horario_evento|time:"H:i" }}{% endif %}</dd></div>
-    <div><dt>Valor</dt><dd>{{ solicitacao.valor|moeda }}</dd></div>
-    <div><dt>Contratante</dt><dd>{{ contraparte.nome }}</dd></div>
+    <div><dt>Contraparte</dt><dd>{{ contraparte.nome }}</dd></div>
     <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento }} <small class="ajuda">{{ contraparte.get_tipo_pessoa_display }}</small></dd></div>
     {% if contraparte.data_nascimento %}<div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>{% endif %}
     {% if contraparte.rg %}<div><dt>RG</dt><dd>{{ contraparte.rg }}</dd></div>{% endif %}
     {% if contraparte.endereco %}<div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>{% endif %}
     {% if contraparte.email %}<div><dt>E-mail</dt><dd>{{ contraparte.email }}</dd></div>{% endif %}
-    <div><dt>Registrada por</dt><dd>{{ solicitacao.criada_por }} em {{ solicitacao.data_criacao|data_hora_br }}</dd></div>
+    <div><dt>Cadastrado por</dt><dd>{{ solicitacao.criada_por }} em {{ solicitacao.data_criacao|data_hora_br }}</dd></div>
   </dl>
 
   {% if contraparte.parte_relacionada %}
@@ -58,7 +52,7 @@
 <section class="cartao">
   <h2>Kit cadastral</h2>
   <p class="ajuda">
-    Exigido para {{ contraparte.get_tipo_pessoa_display|lower }} neste valor.
+    Documentos base exigidos para {{ contraparte.get_tipo_pessoa_display|lower }}.
     Documentos vencidos voltam a ser pendência.
   </p>
 
@@ -67,7 +61,7 @@
     <ul class="lista-kit">
       {% for tipo in kit.faltando %}
         <li class="lista-kit__item">
-          <span class="estado estado--pendente">&#9675; Faltando</span>
+          <span class="estado estado--andamento">&#9675; Faltando</span>
           <span>{{ tipo.nome }}</span>
         </li>
       {% endfor %}
@@ -79,7 +73,7 @@
     <ul class="lista-kit">
       {% for documento in kit.em_analise %}
         <li class="lista-kit__item">
-          <span class="estado estado--pendente">&#9679; Em análise</span>
+          <span class="estado estado--andamento">&#9679; Em análise</span>
           <span class="lista-kit__nome">
             {{ documento.rotulo }}
             <small class="ajuda">{{ documento.arquivos.count }} arquivo{{ documento.arquivos.count|pluralize:",s" }}</small>
@@ -95,7 +89,7 @@
     <ul class="lista-kit">
       {% for documento in kit.com_problema %}
         <li class="lista-kit__item">
-          <span class="estado estado--reprovado">&#10007; {{ documento.get_status_display }}</span>
+          <span class="estado estado--erro">&#10007; {{ documento.get_status_display }}</span>
           <span class="lista-kit__nome">
             {{ documento.rotulo }}{% if documento.esta_vencido %} — vencido{% endif %}
             {% if documento.observacao %}
@@ -113,7 +107,7 @@
     <ul class="lista-kit">
       {% for documento in kit.vigentes %}
         <li class="lista-kit__item">
-          <span class="estado estado--aprovado">&#10003; Aprovado</span>
+          <span class="estado estado--sucesso">&#10003; Aprovado</span>
           <span>{{ documento.rotulo }}</span>
         </li>
       {% endfor %}
@@ -176,7 +170,7 @@
             <td>
               {% if documento.data_vencimento %}
                 {{ documento.data_vencimento|data_br }}
-                {% if documento.esta_vencido %}<span class="estado estado--reprovado">&#10007; vencido</span>{% endif %}
+                {% if documento.esta_vencido %}<span class="estado estado--atencao">&#9888; vencido</span>{% endif %}
               {% else %}não vence{% endif %}
             </td>
             <td>{{ documento.enviado_por|default:"—" }} <small class="ajuda">{{ documento.data_envio|data_hora_br }}</small></td>
@@ -193,7 +187,7 @@
 {% if solicitacao.esta_cancelada %}
   <section class="cartao">
     <p class="aviso aviso--erro">
-      &#10007; <strong>Solicitação cancelada</strong> por {{ solicitacao.cancelada_por|default:"—" }}
+      &#10007; <strong>Perfil cancelado</strong> por {{ solicitacao.cancelada_por|default:"—" }}
       em {{ solicitacao.data_cancelamento|data_hora_br }}.
       {% if solicitacao.motivo_cancelamento %}<br>Motivo: {{ solicitacao.motivo_cancelamento }}{% endif %}
     </p>

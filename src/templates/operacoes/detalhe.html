@@ -28,6 +28,16 @@
 
   <p class="descricao">{{ operacao.descricao }}</p>
 
+  {% if documentos_pendentes and not operacao.esta_encerrada %}
+    <p class="aviso aviso--atencao">
+      &#9888; <strong>Falta{{ documentos_pendentes|length|pluralize:",m" }}
+      {{ documentos_pendentes|length }} documento{{ documentos_pendentes|length|pluralize:",s" }}</strong>
+      para o contrato seguir:
+      {% for tipo in documentos_pendentes %}{{ tipo.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+      <a href="#documentacao">Enviar agora</a>.
+    </p>
+  {% endif %}
+
   {% if operacao.motivo_reprovacao %}
     <p class="aviso aviso--erro"><strong>Motivo da reprovação:</strong> {{ operacao.motivo_reprovacao }}</p>
   {% endif %}
@@ -59,6 +69,41 @@
   {% if etapa_atual and not operacao.esta_encerrada %}
     <div class="decisao">
       <h3 class="subtitulo">Decidir: {{ etapa_atual.get_etapa_display }}</h3>
+      {% if not documentacao_completa %}
+        <p class="aviso aviso--atencao">
+          &#9888; O fluxo está parado na documentação: nada é decidido antes de os
+          documentos serem enviados e aprovados.
+          <a href="#documentacao">Ver o que falta</a>.
+        </p>
+      {% elif conferencia %}
+        <p class="ajuda">
+          Confira se o <strong>Termo de Adesão</strong> repete exatamente os dados abaixo.
+          O contrato-mãe é modelo base e não muda entre operações — a análise recai
+          sobre o termo.
+        </p>
+        <table class="tabela tabela--conferencia">
+          <thead>
+            <tr><th>Campo</th><th>Registrado na operação</th><th>Confere?</th></tr>
+          </thead>
+          <tbody>
+            {% for campo in conferencia %}
+              <tr>
+                <td>
+                  {{ campo.rotulo }}
+                  {% if campo.observacao %}<small class="ajuda">{{ campo.observacao }}</small>{% endif %}
+                </td>
+                <td><strong>{{ campo.valor }}</strong></td>
+                <td class="tabela__numero"><input type="checkbox" aria-label="Confere"></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="ajuda">
+          Os quadradinhos são só apoio de leitura — não são salvos. O que vale é o
+          parecer abaixo, que vai para a auditoria com o seu nome.
+        </p>
+      {% endif %}
+
       {% if pode_decidir %}
         <form method="post" action="{% url 'operacoes:decidir' operacao.pk etapa_atual.pk %}" class="formulario">
           {% csrf_token %}
@@ -70,7 +115,7 @@
             <button type="submit" name="acao" value="reprovar" class="botao botao--perigo">Reprovar</button>
           </div>
         </form>
-      {% else %}
+      {% elif documentacao_completa %}
         <p class="vazio">
           Etapa sob responsabilidade de <strong>{{ etapa_atual.papel_responsavel }}</strong>.
           Você não tem papel para decidi-la.
@@ -80,33 +125,81 @@
   {% endif %}
 </section>
 
-<section class="cartao">
+<section class="cartao" id="documentacao">
   <h2>Documentação exigida</h2>
 
-  <h3 class="subtitulo">Kit Cadastral PJ <small>(da contraparte, reaproveitado entre operações)</small></h3>
-  {% if pendencias_cadastrais %}
-    <ul class="lista-pendencias">
-      {% for tipo in pendencias_cadastrais %}
-        <li><span class="estado estado--pendente">&#9679;</span> {{ tipo.nome }}</li>
+  <p class="ajuda">
+    Os documentos base da contraparte já foram validados no perfil. Abaixo, só o que
+    este contrato exige a mais — e que fica guardado no perfil para os próximos.
+  </p>
+
+  {% if documentos_vinculados %}
+    <h3 class="subtitulo">Vinculados a este contrato</h3>
+    <ul class="lista-kit">
+      {% for documento in documentos_vinculados %}
+        <li class="lista-kit__item">
+          {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+          <span class="lista-kit__nome">{{ documento.rotulo }}</span>
+        </li>
       {% endfor %}
     </ul>
-  {% else %}
-    <p class="vazio">
-      {% if operacao.contraparte.eh_pj %}
-        &#10003; Dossiê cadastral completo e vigente.
-      {% else %}
-        Contraparte pessoa física: exigência definida pelo enquadramento.
-      {% endif %}
-    </p>
   {% endif %}
 
-  <h3 class="subtitulo">Desta operação</h3>
-  {% if documentos_exigidos %}
-    <ul class="lista-pendencias">
-      {% for tipo in documentos_exigidos %}<li>{{ tipo.nome }}</li>{% endfor %}
+  {% if documentos_pendentes %}
+    <h3 class="subtitulo">Faltando</h3>
+    <ul class="lista-kit">
+      {% for tipo in documentos_pendentes %}
+        <li class="lista-kit__item">
+          <span class="estado estado--andamento">&#9675; Faltando</span>
+          <span class="lista-kit__nome">{{ tipo.nome }}</span>
+        </li>
+      {% endfor %}
     </ul>
+
+    {% if form_documentos.fields %}
+      <form method="post" action="{% url 'operacoes:vincular_documentos' operacao.pk %}"
+            class="formulario">
+        {% csrf_token %}
+        <h3 class="subtitulo">Reaproveitar documentos já validados</h3>
+        {% for campo in form_documentos %}
+          <div class="campo">
+            <label>{{ campo.label }}</label>
+            {{ campo }}
+            {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="acoes">
+          <button type="submit" class="botao">Vincular selecionados</button>
+        </div>
+      </form>
+    {% endif %}
+
+    <div class="decisao">
+      <h3 class="subtitulo">Enviar documento novo</h3>
+      <p class="ajuda">
+        O arquivo fica guardado no perfil da contraparte: outro contrato do mesmo tipo
+        poderá reaproveitá-lo.
+      </p>
+      {{ config_campos|json_script:"config-campos-documento" }}
+      <form method="post" action="{% url 'operacoes:enviar_documento' operacao.pk %}"
+            enctype="multipart/form-data" class="formulario">
+        {% csrf_token %}
+        {% for campo in form_envio %}
+          <div class="campo"{% if campo.name in form_envio.CAMPOS_CONDICIONAIS %} hidden{% endif %}>
+            <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            {{ campo }}
+            {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="acoes">
+          <button type="submit" class="botao botao--grande">Enviar documento</button>
+        </div>
+      </form>
+    </div>
+  {% elif documentos_exigidos %}
+    <p class="vazio">&#10003; Documentação do contrato completa.</p>
   {% else %}
-    <p class="vazio">Nenhuma exigência específica.</p>
+    <p class="vazio">Nenhuma exigência específica além do perfil.</p>
   {% endif %}
 </section>
 

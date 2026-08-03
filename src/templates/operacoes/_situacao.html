@@ -1,14 +1,7 @@
-{% comment %}
-Estado nunca depende só de cor: o símbolo acompanha o texto (AGENTS.md §8).
+{% load situacao %}{% comment %}
+Selo de situação. Espera `status` (valor bruto) e `rotulo` (texto legível).
+
+A cor vem de um mapa único em `operacoes/templatetags/situacao.py` — não escreva
+cor de estado direto no template (AGENTS.md §8).
 {% endcomment %}
-{% if status == "aprovada" or status == "concluida" or status == "assinada" %}
-  <span class="estado estado--aprovado">&#10003; {{ rotulo }}</span>
-{% elif status == "reprovada" %}
-  <span class="estado estado--reprovado">&#10007; {{ rotulo }}</span>
-{% elif status == "cumprida_na_habilitacao" %}
-  <span class="estado estado--aprovado">&#10003; {{ rotulo }}</span>
-{% elif status == "dispensada" or status == "registrada_externamente" %}
-  <span class="estado estado--neutro">&#8211; {{ rotulo }}</span>
-{% else %}
-  <span class="estado estado--pendente">&#9679; {{ rotulo }}</span>
-{% endif %}
+<span class="estado estado--{{ status|familia }}">{{ status|simbolo }} {{ rotulo }}</span>

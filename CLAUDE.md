@@ -171,6 +171,15 @@ leva a habilitação para `EM_CREDITO` ou direto para `HABILITADA`, conforme a m
 blocos, evidências e veredito. Concluir **habilita a contraparte** e marca a solicitação
 como pronta para contrato — fim da Fase 1.
 
+**Perfil × contrato separados** (AGENTS.md D29, D30): `Solicitacao` virou o **perfil** da
+contraparte (só documentos base, sem valor nem evento); `Operacao` carrega tipo, descrição,
+data, horário e valor, mais os documentos complementares escolhidos do perfil. Crédito
+continua na esteira do perfil (análise da pessoa) e é **ancorado** no enquadramento do
+primeiro contrato que o usar — outro tipo ou outra faixa pedem análise nova.
+
+> **Dívida conhecida:** o app ainda se chama `solicitacoes`, mas hospeda os **perfis**.
+> Renomear para `perfis` quando houver um momento tranquilo — mexe em migrations.
+
 **Fase 1 e Fase 2 amarradas:** a operação (contrato) só nasce de uma solicitação com
 contraparte habilitada, e as etapas 1 a 3 chegam como `CUMPRIDA_NA_HABILITACAO`, trazendo
 o veredito dos pareceres. O contrato começa direto na revisão jurídica.

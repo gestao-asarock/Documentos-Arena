@@ -42,9 +42,7 @@ def nova(request):
         contraparte, _ = obter_ou_criar_contraparte(
             documento=form.cleaned_data["documento"], dados=form.dados_da_contraparte
         )
-        solicitacao = Solicitacao.objects.create(
-            contraparte=contraparte, criada_por=request.user
-        )
+        solicitacao = Solicitacao.objects.create(contraparte=contraparte, criada_por=request.user)
         registrar(
             acao=Acao.CRIACAO,
             descricao=f"Perfil #{solicitacao.pk} cadastrado",
@@ -77,7 +75,7 @@ def detalhe(request, pk: int):
             and pode_cancelar(request.user, solicitacao),
             "exigencias": solicitacao.exigencias_cadastrais(),
             "pendencias": pendencias,
-            "kit": solicitacao.contraparte.situacao_do_kit(solicitacao.valor),
+            "kit": solicitacao.contraparte.situacao_do_kit(),
             "documentos": solicitacao.contraparte.documentos_cadastrais.select_related(
                 "tipo", "subtipo"
             ).prefetch_related("arquivos"),

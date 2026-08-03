@@ -250,6 +250,7 @@ class StatusHabilitacao(models.TextChoices):
     EM_ANALISE_DOCUMENTAL = "em_analise_documental", "Em análise documental"
     COM_PENDENCIA = "com_pendencia", "Com pendência"
     EM_COMPLIANCE = "em_compliance", "Em análise de compliance"
+    EM_CREDITO = "em_credito", "Em análise de crédito"
     HABILITADA = "habilitada", "Perfil validado"
     RECUSADA = "recusada", "Recusado"
 

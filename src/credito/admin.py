@@ -11,7 +11,7 @@ class EvidenciaInline(admin.TabularInline):
 
 @admin.register(ParecerCredito)
 class ParecerCreditoAdmin(admin.ModelAdmin):
-    list_display = ("habilitacao", "status", "veredito", "analista", "data_conclusao")
-    list_filter = ("status", "veredito")
-    search_fields = ("habilitacao__contraparte__nome", "habilitacao__contraparte__documento")
+    list_display = ("contraparte", "regra", "status", "veredito", "analista", "data_conclusao")
+    list_filter = ("status", "veredito", "regra")
+    search_fields = ("contraparte__nome", "contraparte__documento")
     inlines = [EvidenciaInline]

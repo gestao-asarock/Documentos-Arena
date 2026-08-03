@@ -32,7 +32,7 @@
           <td>{{ habilitacao.contraparte.get_tipo_pessoa_display }}</td>
           <td>
             {% if habilitacao.contraparte.parte_relacionada %}
-              <span class="estado estado--pendente">&#9888; Sim</span>
+              <span class="estado estado--atencao">&#9888; Sim</span>
             {% else %}Não{% endif %}
           </td>
           <td>{{ habilitacao.data_criacao|data_hora_br }}</td>

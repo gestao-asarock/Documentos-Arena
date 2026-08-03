@@ -5,8 +5,10 @@ from .models import Solicitacao
 
 @admin.register(Solicitacao)
 class SolicitacaoAdmin(admin.ModelAdmin):
-    list_display = ("id", "descricao", "contraparte", "valor", "data_evento", "status")
-    list_filter = ("status", "tipo_operacao")
-    search_fields = ("descricao", "contraparte__nome", "contraparte__documento")
+    """Perfil da contraparte (AGENTS.md D29)."""
+
+    list_display = ("id", "contraparte", "status", "criada_por", "data_criacao")
+    list_filter = ("status",)
+    search_fields = ("contraparte__nome", "contraparte__documento")
     autocomplete_fields = ("contraparte",)
     readonly_fields = ("data_criacao", "data_atualizacao")

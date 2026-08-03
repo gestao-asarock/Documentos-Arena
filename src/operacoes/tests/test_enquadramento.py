@@ -65,7 +65,9 @@ def test_enquadrar_gera_as_etapas_da_matriz(criar_operacao, regra_piloto, usuari
     """O piloto exerce as seis colunas da matriz (AGENTS.md §4.3)."""
     operacao = enquadrar(criar_operacao("4000.00"), usuario=usuario)
 
-    assert operacao.status == StatusOperacao.AGUARDANDO_DOCUMENTOS
+    # Esta regra de teste não tem exigência documental, então o contrato já
+    # começa na primeira etapa a decidir — o crédito (AGENTS.md D30).
+    assert operacao.status == StatusOperacao.EM_CREDITO
     assert operacao.regra == regra_piloto
 
     etapas = {e.etapa for e in operacao.etapas.all()}
@@ -87,11 +89,11 @@ def test_etapas_nascem_no_estado_certo(criar_operacao, regra_piloto):
 
     por_etapa = {e.etapa: e.status for e in operacao.etapas.all()}
 
-    # Fase 1: resolvidas na habilitação, não se repetem por contrato.
+    # Perfil: resolvidas na validação da contraparte, não se repetem por contrato.
     assert por_etapa[Etapa.TRIAGEM] == StatusEtapa.CUMPRIDA_NA_HABILITACAO
     assert por_etapa[Etapa.DUE_DILIGENCE] == StatusEtapa.CUMPRIDA_NA_HABILITACAO
-    assert por_etapa[Etapa.RISCO_CREDITO] == StatusEtapa.CUMPRIDA_NA_HABILITACAO
-    # Fase 2: é o que se trabalha aqui.
+    # Crédito é do contrato: depende do valor (AGENTS.md D30).
+    assert por_etapa[Etapa.RISCO_CREDITO] == StatusEtapa.PENDENTE
     assert por_etapa[Etapa.JURIDICO] == StatusEtapa.PENDENTE
     assert por_etapa[Etapa.ASSINATURAS] == StatusEtapa.PENDENTE
     # Genial: só registro.
@@ -120,10 +122,11 @@ def test_contrato_exige_contraparte_habilitada(
         enquadrar(operacao)
 
 
-def test_primeira_etapa_a_trabalhar_e_a_juridica(criar_operacao, regra_piloto):
+def test_primeira_etapa_a_trabalhar_e_o_credito(criar_operacao, regra_piloto):
+    """O piloto exige Risco/Crédito, e ele não vem do perfil (AGENTS.md D30)."""
     operacao = enquadrar(criar_operacao("1000.00"))
 
-    assert operacao.etapa_atual.etapa == Etapa.JURIDICO
+    assert operacao.etapa_atual.etapa == Etapa.RISCO_CREDITO
 
 
 def test_fluxo_sem_compliance_e_risco_nao_gera_essas_etapas(criar_operacao, aluguel):

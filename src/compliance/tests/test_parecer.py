@@ -1,10 +1,9 @@
 """
-Due diligence (AGENTS.md §4.7, D22 e D23).
+Due diligence do perfil (AGENTS.md §4.7, D22, D29).
 
-O veredito é humano e obrigatório; crédito só entra quando a matriz exige.
+O veredito é humano e obrigatório. Concluir aqui valida o perfil — crédito é por
+contrato, porque depende do valor (D30).
 """
-
-from decimal import Decimal
 
 import pytest
 from django.contrib.auth.models import Group
@@ -20,7 +19,6 @@ from compliance.servicos import (
 )
 from contas.models import Papel, Usuario
 from contrapartes.models import StatusHabilitacao
-from operacoes.models import TipoOperacao
 from solicitacoes.models import Solicitacao
 from solicitacoes.servicos import abrir_habilitacao, obter_ou_criar_contraparte
 
@@ -48,13 +46,7 @@ def habilitacao(clube):
     contraparte, _ = obter_ou_criar_contraparte(
         documento="58974790890", dados={"nome": "Contratante Fictício"}
     )
-    solicitacao = Solicitacao.objects.create(
-        contraparte=contraparte,
-        tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
-        descricao="Formatura de balé",
-        valor=Decimal("2000.00"),
-        criada_por=clube,
-    )
+    solicitacao = Solicitacao.objects.create(contraparte=contraparte, criada_por=clube)
     registro = abrir_habilitacao(solicitacao, usuario=clube)
     registro.status = StatusHabilitacao.EM_COMPLIANCE
     registro.save()
@@ -96,9 +88,8 @@ def test_concluir_exige_justificativa(habilitacao, compliance):
         concluir_parecer(parecer, usuario=compliance)
 
 
-def test_conclusao_leva_para_credito_quando_a_matriz_exige(habilitacao, compliance):
-    """O piloto exige Risco/Crédito, então a habilitação não termina aqui (D23)."""
-    assert habilitacao.exige_credito
+def test_conclusao_manda_o_perfil_para_o_credito(habilitacao, compliance):
+    """O perfil só é validado depois do crédito (AGENTS.md D30)."""
     parecer = obter_ou_criar_parecer(habilitacao, usuario=compliance)
     parecer.veredito = Veredito.BAIXO
     parecer.justificativa = "Nada consta nas fontes consultadas."
@@ -107,26 +98,24 @@ def test_conclusao_leva_para_credito_quando_a_matriz_exige(habilitacao, complian
     habilitacao.refresh_from_db()
 
     assert habilitacao.status == StatusHabilitacao.EM_CREDITO
+    # Ainda não pode contratar: falta o crédito.
+    assert not habilitacao.contraparte.esta_habilitada
 
 
-def test_conclusao_habilita_quando_credito_nao_e_exigido(habilitacao, compliance):
-    habilitacao.exige_credito = False
-    habilitacao.save()
+def test_compliance_sozinho_nao_libera_o_contrato(habilitacao, compliance):
     parecer = obter_ou_criar_parecer(habilitacao, usuario=compliance)
     parecer.veredito = Veredito.MODERADO
     parecer.justificativa = "Processos cíveis antigos, sem relação com o objeto."
 
     concluir_parecer(parecer, usuario=compliance)
-    habilitacao.refresh_from_db()
+    perfil = habilitacao.solicitacoes.first()
+    perfil.refresh_from_db()
 
-    assert habilitacao.status == StatusHabilitacao.HABILITADA
-    assert habilitacao.contraparte.esta_habilitada
+    assert perfil.status != "pronta_para_contrato"
 
 
 def test_risco_alto_nao_bloqueia_sozinho(habilitacao, compliance):
     """Escalar é decisão de governança, ainda em aberto (P6 no CLAUDE.md)."""
-    habilitacao.exige_credito = False
-    habilitacao.save()
     parecer = obter_ou_criar_parecer(habilitacao, usuario=compliance)
     parecer.veredito = Veredito.ALTO
     parecer.justificativa = "Sócio com processo criminal em andamento."
@@ -135,7 +124,7 @@ def test_risco_alto_nao_bloqueia_sozinho(habilitacao, compliance):
     habilitacao.refresh_from_db()
 
     assert parecer.eh_risco_alto
-    assert habilitacao.status == StatusHabilitacao.HABILITADA
+    assert habilitacao.status == StatusHabilitacao.EM_CREDITO
 
 
 def test_recusa_encerra_a_habilitacao(habilitacao, compliance):

@@ -48,7 +48,7 @@
         <dd>
           {{ documento.data_vencimento|data_br }}
           {% if documento.esta_vencido %}
-            <span class="estado estado--reprovado">&#10007; vencido</span>
+            <span class="estado estado--atencao">&#9888; vencido</span>
           {% endif %}
         </dd>
       </div>
@@ -57,9 +57,9 @@
 
   {% if solicitacao %}
     <p class="ajuda">
-      Solicitação
+      Perfil
       <a href="{% url 'solicitacoes:detalhe' solicitacao.pk %}">#{{ solicitacao.pk }}</a>
-      — {{ solicitacao.descricao }}, {{ solicitacao.valor|moeda }}.
+      — {{ contraparte.get_tipo_pessoa_display }}.
     </p>
   {% endif %}
 </section>

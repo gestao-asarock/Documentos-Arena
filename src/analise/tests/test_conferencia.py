@@ -4,8 +4,6 @@ Conferência documental (AGENTS.md §4.6).
 O estado da habilitação é derivado do dossiê, nunca assumido.
 """
 
-from decimal import Decimal
-
 import pytest
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -15,7 +13,6 @@ from analise.servicos import aprovar_documento, fila_de_conferencia, rejeitar_do
 from contas.models import Papel, Usuario
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral, StatusHabilitacao
 from documentos.models import StatusDocumento
-from operacoes.models import TipoOperacao
 from solicitacoes.models import Solicitacao
 from solicitacoes.servicos import abrir_habilitacao, obter_ou_criar_contraparte
 
@@ -45,13 +42,7 @@ def solicitacao(clube):
     contraparte, _ = obter_ou_criar_contraparte(
         documento="58974790890", dados={"nome": "Contratante Fictício"}
     )
-    solicitacao = Solicitacao.objects.create(
-        contraparte=contraparte,
-        tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
-        descricao="Formatura de balé",
-        valor=Decimal("2000.00"),
-        criada_por=clube,
-    )
+    solicitacao = Solicitacao.objects.create(contraparte=contraparte, criada_por=clube)
     abrir_habilitacao(solicitacao, usuario=clube)
     return solicitacao
 

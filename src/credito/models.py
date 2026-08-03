@@ -32,12 +32,13 @@ class BlocoCredito(models.TextChoices):
 
 
 class ParecerCredito(models.Model):
-    """Parecer válido para um par **contraparte + enquadramento** (AGENTS.md D30).
+    """Análise de crédito da contraparte (AGENTS.md D30).
 
-    Crédito depende do valor: uma análise feita para um aluguel de R$ 2.000,00
-    não sustenta um serviço de R$ 200.000,00. Por isso o parecer é reaproveitado
-    apenas em operações do mesmo tipo e da mesma faixa; mudou de faixa ou de
-    tipo, nova análise.
+    Nasce na esteira do **perfil**, como avaliação da pessoa — score, restrições,
+    protestos —, sem valor de referência. O primeiro contrato que a usar ancora o
+    parecer no enquadramento dele; a partir daí, contrato de tipo diferente ou de
+    outra faixa exige nova análise, porque um parecer feito para R$ 2.000,00 não
+    sustenta R$ 200.000,00.
     """
 
     contraparte = models.ForeignKey(
@@ -46,8 +47,12 @@ class ParecerCredito(models.Model):
     regra = models.ForeignKey(
         "operacoes.RegraEnquadramento",
         on_delete=models.PROTECT,
+        null=True,
+        blank=True,
         related_name="pareceres_credito",
         verbose_name="enquadramento",
+        help_text="Em branco enquanto o parecer é do perfil, sem contrato associado. "
+        "O primeiro contrato que o usar ancora o parecer no seu enquadramento.",
     )
     operacao = models.ForeignKey(
         "operacoes.Operacao",
@@ -116,7 +121,8 @@ class ParecerCredito(models.Model):
         ordering = ("-data_criacao",)
 
     def __str__(self) -> str:
-        return f"Crédito — {self.contraparte.nome} ({self.regra.criterio})"
+        alcance = self.regra.criterio if self.regra_id else "perfil"
+        return f"Crédito — {self.contraparte.nome} ({alcance})"
 
     @property
     def esta_concluido(self) -> bool:

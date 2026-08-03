@@ -46,9 +46,6 @@ def solicitacao(clube):
     Habilitacao.objects.create(contraparte=contraparte, status=StatusHabilitacao.HABILITADA)
     return Solicitacao.objects.create(
         contraparte=contraparte,
-        tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
-        descricao="Formatura de balé",
-        valor=Decimal("2000.00"),
         criada_por=clube,
         status=StatusSolicitacao.PRONTA_PARA_CONTRATO,
     )
@@ -57,10 +54,9 @@ def solicitacao(clube):
 @pytest.fixture
 def operacao(solicitacao, crm):
     registro = Operacao.objects.create(
-        solicitacao=solicitacao,
         contraparte=solicitacao.contraparte,
-        tipo_operacao=solicitacao.tipo_operacao,
-        valor_total=solicitacao.valor,
+        tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
+        valor_total=Decimal("2000.00"),
         descricao="Contrato de cessão de espaço",
         criada_por=crm,
     )
@@ -98,15 +94,15 @@ def test_nao_cancela_duas_vezes(solicitacao, clube):
         solicitacao.cancelar("De novo.", usuario=clube)
 
 
-def test_solicitacao_com_contrato_aberto_nao_cancela(solicitacao, operacao, clube):
-    """Cancele o contrato antes: senão sobraria contrato órfão."""
+def test_perfil_com_contrato_em_andamento_nao_cancela(solicitacao, operacao, clube):
+    """Encerre o contrato antes: senão sobraria contrato sem perfil ativo."""
     assert not solicitacao.pode_ser_cancelada
 
     with pytest.raises(ValidationError):
         solicitacao.cancelar("Desistência.", usuario=clube)
 
 
-def test_cancelar_o_contrato_libera_a_solicitacao(solicitacao, operacao, crm):
+def test_cancelar_o_contrato_libera_o_perfil(solicitacao, operacao, crm):
     operacao.cancelar("Contrato refeito.", usuario=crm)
     operacao.save()
     solicitacao.refresh_from_db()
@@ -146,9 +142,7 @@ def test_interno_cancela_solicitacao_do_clube(client, crm, solicitacao):
 def test_cancelar_operacao(client, crm, operacao):
     client.force_login(crm)
 
-    client.post(
-        reverse("operacoes:cancelar", args=[operacao.pk]), {"motivo": "Valor renegociado."}
-    )
+    client.post(reverse("operacoes:cancelar", args=[operacao.pk]), {"motivo": "Valor renegociado."})
     operacao.refresh_from_db()
 
     assert operacao.status == StatusOperacao.CANCELADA
@@ -173,13 +167,13 @@ def test_get_nao_cancela(client, crm, operacao):
     assert operacao.status != StatusOperacao.CANCELADA
 
 
-def test_solicitacao_cancelada_mostra_o_motivo(client, clube, solicitacao):
-    solicitacao.cancelar("Evento desmarcado.", usuario=clube)
+def test_perfil_cancelado_mostra_o_motivo(client, clube, solicitacao):
+    solicitacao.cancelar("Cadastro duplicado.", usuario=clube)
     solicitacao.save()
     client.force_login(clube)
 
     corpo = client.get(reverse("solicitacoes:detalhe", args=[solicitacao.pk])).content.decode()
 
-    assert "Evento desmarcado." in corpo
+    assert "Cadastro duplicado." in corpo
     # Sem botão de cancelar de novo.
     assert reverse("solicitacoes:cancelar", args=[solicitacao.pk]) not in corpo

@@ -62,7 +62,21 @@ def aprovar_documento(documento: DocumentoCadastral, *, usuario, observacao: str
         objeto=documento,
         usuario=usuario,
     )
+    _reavaliar_contratos(documento)
     return _reavaliar_habilitacao(documento, usuario=usuario)
+
+
+def _reavaliar_contratos(documento: DocumentoCadastral) -> None:
+    """Move os contratos que dependiam deste documento.
+
+    O documento pertence ao perfil, mas pode estar vinculado a contratos: sem
+    isto, aprovar o último documento não tirava o contrato de 'aguardando
+    documentos' e ele nunca chegava à fila seguinte (AGENTS.md D29).
+    """
+    from operacoes.servicos import avancar
+
+    for operacao in documento.operacoes.all():
+        avancar(operacao)
 
 
 @transaction.atomic

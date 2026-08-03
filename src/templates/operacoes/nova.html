@@ -5,18 +5,14 @@
 {% block conteudo %}
 <div class="pagina__topo"><h1>Novo contrato</h1></div>
 
-{% if not tem_solicitacoes %}
+{% if not tem_perfis %}
   <section class="cartao cartao--estreito">
-    <p class="aviso aviso--atencao">
-      &#9888; Nenhuma solicitação pronta para contrato.
-    </p>
+    <p class="aviso aviso--atencao">&#9888; Nenhum perfil validado.</p>
     <p class="ajuda">
-      O contrato só começa depois que a contraparte é habilitada: kit cadastral conferido,
-      due diligence e análise de crédito concluídas.
+      O contrato só começa com a contraparte de perfil validado: documentos base
+      conferidos e due diligence concluída.
     </p>
-    <p>
-      <a class="botao botao--discreto" href="{% url 'solicitacoes:lista' %}">Ver solicitações</a>
-    </p>
+    <p><a class="botao botao--discreto" href="{% url 'solicitacoes:lista' %}">Ver perfis</a></p>
   </section>
 {% else %}
   <section class="cartao cartao--estreito">
@@ -36,8 +32,8 @@
       {% endfor %}
 
       <p class="ajuda">
-        Contraparte, tipo e valor vêm da solicitação — foram eles que passaram pela
-        habilitação e não se redigitam aqui.
+        Depois de criar, o sistema mostra quais documentos este tipo de operação exige —
+        e você pode reaproveitar os já validados no perfil.
       </p>
 
       <div class="acoes">

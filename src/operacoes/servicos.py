@@ -78,15 +78,37 @@ def _status_inicial_da_etapa(etapa: Etapa, operacao: Operacao) -> str:
 
 
 def _parecer_de_credito_vigente(operacao: Operacao):
-    """Parecer de crédito já concluído para esta contraparte neste enquadramento."""
+    """Parecer de crédito que cobre este contrato, se houver (AGENTS.md D30).
+
+    Serve o parecer já ancorado neste enquadramento ou, na falta dele, o parecer
+    do perfil ainda não usado por contrato nenhum — que é o caso do primeiro
+    contrato depois da validação.
+    """
     from credito.models import ParecerCredito
 
-    for parecer in ParecerCredito.objects.filter(
-        contraparte_id=operacao.contraparte_id, regra_id=operacao.regra_id
-    ):
+    pareceres = ParecerCredito.objects.filter(contraparte_id=operacao.contraparte_id)
+
+    for parecer in pareceres.filter(regra_id=operacao.regra_id):
+        if parecer.esta_vigente:
+            return parecer
+
+    for parecer in pareceres.filter(regra__isnull=True):
         if parecer.esta_vigente:
             return parecer
     return None
+
+
+def _ancorar_parecer_de_credito(operacao: Operacao) -> None:
+    """Fixa o parecer do perfil no enquadramento do primeiro contrato que o usa.
+
+    A partir daí, contrato de outro tipo ou de outra faixa não o reaproveita e
+    exige análise nova — que é a regra que o responsável definiu (D30).
+    """
+    parecer = _parecer_de_credito_vigente(operacao)
+    if parecer is not None and parecer.regra_id is None:
+        parecer.regra = operacao.regra
+        parecer.operacao = operacao
+        parecer.save(update_fields=["regra", "operacao"])
 
 
 def _parecer_da_habilitacao(etapa: Etapa, habilitacao, operacao: Operacao) -> str:
@@ -98,14 +120,17 @@ def _parecer_da_habilitacao(etapa: Etapa, habilitacao, operacao: Operacao) -> st
         parecer = getattr(habilitacao, "parecer_compliance", None)
         if parecer is None or not parecer.veredito:
             return f"Cumprida na validação do perfil #{habilitacao.pk}."
-        return f"Perfil #{habilitacao.pk} — {parecer.get_veredito_display()}: {parecer.justificativa}"
+        return (
+            f"Perfil #{habilitacao.pk} — {parecer.get_veredito_display()}: {parecer.justificativa}"
+        )
 
     if etapa == Etapa.RISCO_CREDITO:
         parecer = _parecer_de_credito_vigente(operacao)
         if parecer is None:
             return ""
+        origem = parecer.regra.criterio if parecer.regra_id else "análise do perfil"
         return (
-            f"Parecer de crédito reaproveitado ({parecer.regra.criterio}) — "
+            f"Crédito já analisado ({origem}) — "
             f"{parecer.get_veredito_display()}: {parecer.justificativa}"
         )
 
@@ -159,13 +184,17 @@ def enquadrar(operacao: Operacao, *, usuario=None) -> Operacao:
         ]
     )
 
+    _ancorar_parecer_de_credito(operacao)
+
     registrar(
         acao=Acao.ENQUADRAMENTO,
         descricao=f"Operação #{operacao.pk} enquadrada como '{regra.criterio}'",
         objeto=operacao,
         usuario=usuario,
     )
-    return operacao
+
+    # Sem isto o contrato nascia parado: nada o levava à primeira etapa real.
+    return avancar(operacao)
 
 
 @transaction.atomic
@@ -185,6 +214,15 @@ def decidir_etapa(
     operacao = etapa.operacao
     if operacao.esta_encerrada:
         raise TransicaoInvalida("Operação encerrada não recebe novas decisões.")
+
+    # O fluxo é linear: ninguém analisa o que ainda não foi enviado. Sem isto era
+    # possível aprovar a revisão jurídica de um contrato inexistente.
+    if not operacao.documentacao_completa:
+        faltando = ", ".join(tipo.nome for tipo in operacao.documentos_pendentes())
+        raise TransicaoInvalida(
+            f"Documentação incompleta: falta {faltando}. "
+            "Envie e aprove os documentos antes de decidir as etapas."
+        )
 
     etapa.status = StatusEtapa.APROVADA if aprovada else StatusEtapa.REPROVADA
     etapa.parecer = parecer
@@ -236,13 +274,14 @@ def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Opera
             operacao.save()
         return operacao
 
-    if proxima.etapa == Etapa.ASSINATURAS:
+    # A ordem importa: sem os documentos do contrato não há o que analisar, então
+    # a falta deles vem antes de qualquer etapa.
+    if not operacao.documentacao_completa:
+        destino = StatusOperacao.AGUARDANDO_DOCUMENTOS
+    elif proxima.etapa == Etapa.ASSINATURAS:
         destino = StatusOperacao.AGUARDANDO_ASSINATURA
     elif proxima.etapa == Etapa.RISCO_CREDITO:
         destino = StatusOperacao.EM_CREDITO
-    elif not operacao.documentacao_completa:
-        # Sem os documentos do contrato não há o que analisar.
-        destino = StatusOperacao.AGUARDANDO_DOCUMENTOS
     else:
         destino = StatusOperacao.EM_APROVACAO
 
@@ -251,18 +290,6 @@ def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Opera
         operacao.save()
 
     return operacao
-
-
-def solicitacoes_prontas_para_contrato(usuario):
-    """Solicitações cuja contraparte já está habilitada e ainda não viraram contrato."""
-    from solicitacoes.models import StatusSolicitacao
-    from solicitacoes.servicos import solicitacoes_visiveis_para
-
-    return (
-        solicitacoes_visiveis_para(usuario)
-        .filter(status=StatusSolicitacao.PRONTA_PARA_CONTRATO)
-        .exclude(operacoes__isnull=False)
-    )
 
 
 def operacoes_visiveis_para(usuario):

@@ -18,8 +18,8 @@
       <div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>
     {% endif %}
     {% if contraparte.endereco %}<div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>{% endif %}
-    {% if solicitacao %}
-      <div><dt>Operação</dt><dd>{{ solicitacao.descricao }} — {{ solicitacao.valor|moeda }}</dd></div>
+    {% if contraparte.endereco %}
+      <div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>
     {% endif %}
   </dl>
 

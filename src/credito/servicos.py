@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from auditoria.servicos import Acao, registrar
 from contas.models import Papel
+from contrapartes.models import Habilitacao, StatusHabilitacao
 from operacoes.estados import Etapa, StatusOperacao
 from operacoes.models import Operacao
 from operacoes.servicos import decidir_etapa
@@ -28,16 +29,32 @@ def pode_analisar(usuario) -> bool:
     return usuario.groups.filter(name__in=PAPEIS_DE_CREDITO).exists()
 
 
-def fila_de_credito():
-    """Contratos aguardando análise de crédito.
+def fila_de_perfis():
+    """Perfis aprovados no compliance, aguardando a análise de crédito da pessoa."""
+    return (
+        Habilitacao.objects.filter(status=StatusHabilitacao.EM_CREDITO)
+        .select_related("contraparte")
+        .order_by("data_criacao")
+    )
 
-    Crédito é por contrato porque depende do valor (AGENTS.md D30).
-    """
+
+def fila_de_credito():
+    """Contratos que precisam de análise própria — tipo ou faixa novos (D30)."""
     return (
         Operacao.objects.filter(status=StatusOperacao.EM_CREDITO)
         .select_related("contraparte", "tipo_operacao", "regra")
         .order_by("data_criacao")
     )
+
+
+def obter_ou_criar_parecer_do_perfil(habilitacao: Habilitacao, *, usuario=None) -> ParecerCredito:
+    """Parecer da pessoa, sem enquadramento: score, restrições, protestos."""
+    parecer, _ = ParecerCredito.objects.get_or_create(
+        contraparte=habilitacao.contraparte,
+        regra=None,
+        defaults={"analista": usuario},
+    )
+    return parecer
 
 
 def obter_ou_criar_parecer(operacao: Operacao, *, usuario=None) -> ParecerCredito:
@@ -48,6 +65,58 @@ def obter_ou_criar_parecer(operacao: Operacao, *, usuario=None) -> ParecerCredit
         defaults={"analista": usuario, "operacao": operacao},
     )
     return parecer
+
+
+@transaction.atomic
+def concluir_parecer_do_perfil(parecer: ParecerCredito, habilitacao: Habilitacao, *, usuario):
+    """Fecha o crédito do perfil e valida a contraparte.
+
+    Última etapa da esteira do perfil: daqui em diante ela pode contratar.
+    """
+    if not parecer.veredito:
+        raise ParecerIncompleto("Escolha o veredito de risco para concluir.")
+    if not parecer.justificativa.strip():
+        raise ParecerIncompleto("Justifique o veredito para concluir.")
+
+    parecer.status = StatusParecer.CONCLUIDO
+    parecer.analista = parecer.analista or usuario
+    parecer.data_conclusao = timezone.now()
+    parecer.save()
+
+    habilitacao.status = StatusHabilitacao.HABILITADA
+    habilitacao.data_conclusao = timezone.now()
+    habilitacao.save()
+    habilitacao.solicitacoes.update(status="pronta_para_contrato")
+
+    registrar(
+        acao=Acao.APROVACAO,
+        descricao=(
+            f"Crédito do perfil concluído para a contraparte #{habilitacao.contraparte_id}: "
+            f"{parecer.get_veredito_display()}. Perfil validado."
+        ),
+        objeto=habilitacao,
+        usuario=usuario,
+    )
+    return habilitacao
+
+
+@transaction.atomic
+def recusar_perfil(habilitacao: Habilitacao, *, usuario, motivo: str) -> Habilitacao:
+    """Barra a contraparte no crédito. Estado terminal do perfil."""
+    if not motivo.strip():
+        raise ParecerIncompleto("Informe o motivo da recusa.")
+
+    habilitacao.status = StatusHabilitacao.RECUSADA
+    habilitacao.motivo_recusa = motivo
+    habilitacao.save()
+
+    registrar(
+        acao=Acao.REPROVACAO,
+        descricao=f"Perfil da contraparte #{habilitacao.contraparte_id} recusado no crédito",
+        objeto=habilitacao,
+        usuario=usuario,
+    )
+    return habilitacao
 
 
 @transaction.atomic

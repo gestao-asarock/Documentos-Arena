@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Crédito do perfil — {{ contraparte.nome }}{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>{{ contraparte.nome }}</h1>
+  {% include "operacoes/_situacao.html" with status=habilitacao.status rotulo=habilitacao.get_status_display %}
+</div>
+
+<section class="cartao">
+  <h2>Perfil</h2>
+  <dl class="dados">
+    <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento }}</dd></div>
+    <div><dt>Tipo</dt><dd>{{ contraparte.get_tipo_pessoa_display }}</dd></div>
+    {% if contraparte.data_nascimento %}
+      <div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>
+    {% endif %}
+    {% if contraparte.endereco %}<div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>{% endif %}
+  </dl>
+
+  <p class="ajuda">
+    Esta é a análise <strong>da pessoa</strong>: score, restrições e protestos, sem valor
+    de referência. Ela vale para o primeiro contrato; contrato de outro tipo ou de outra
+    faixa de valor exigirá análise própria.
+  </p>
+
+  {% if parecer_compliance.esta_concluido %}
+    <p class="ajuda">
+      <strong>Compliance:</strong> {{ parecer_compliance.get_veredito_display }} —
+      {{ parecer_compliance.justificativa }}
+    </p>
+  {% endif %}
+</section>
+
+{% if parecer.esta_concluido %}
+  <section class="cartao">
+    <h2>Parecer concluído</h2>
+    <p>
+      <strong>{{ parecer.get_veredito_display }}</strong> — por {{ parecer.analista|default:"—" }}
+      em {{ parecer.data_conclusao|data_hora_br }}.
+    </p>
+    <p>{{ parecer.justificativa }}</p>
+  </section>
+{% else %}
+  <form method="post" class="formulario">
+    {% csrf_token %}
+
+    <section class="cartao">
+      <h2>Verificações</h2>
+      <p class="ajuda">
+        Capacidade de pagamento e balanço podem ficar em branco: sem contrato, não há
+        valor a comparar.
+      </p>
+      {% for campo in form.campos_dos_blocos %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+        </div>
+      {% endfor %}
+    </section>
+
+    <section class="cartao">
+      <h2>Conclusão</h2>
+      {% for campo in form.campos_da_conclusao %}
+        <div class="campo">
+          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+          {{ campo }}
+          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+          {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
+        </div>
+      {% endfor %}
+
+      <p class="ajuda">
+        Concluir aqui <strong>valida o perfil</strong>: é a última etapa antes de a
+        contraparte poder contratar.
+      </p>
+
+      <div class="acoes">
+        <button type="submit" name="acao" value="salvar" class="botao botao--discreto botao--grande">
+          Salvar rascunho
+        </button>
+        <button type="submit" name="acao" value="concluir" class="botao botao--grande">
+          Concluir e validar perfil
+        </button>
+      </div>
+    </section>
+  </form>
+
+  <section class="cartao">
+    <h2>Recusar perfil</h2>
+    <p class="ajuda">Encerra a validação. A contraparte não poderá contratar.</p>
+    <form method="post" action="{% url 'credito:recusar_perfil' habilitacao.pk %}"
+          class="formulario" data-confirmar="Recusar este perfil na análise de crédito?">
+      {% csrf_token %}
+      <div class="campo">
+        <label for="motivo">Motivo</label>
+        <textarea id="motivo" name="motivo" rows="2"></textarea>
+      </div>
+      <div class="acoes">
+        <button type="submit" class="botao botao--perigo">Recusar perfil</button>
+      </div>
+    </form>
+  </section>
+{% endif %}
+
+<p><a class="botao botao--discreto" href="{% url 'credito:fila' %}">Voltar à fila</a></p>
+{% endblock %}

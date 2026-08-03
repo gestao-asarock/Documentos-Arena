@@ -9,12 +9,12 @@ from dataclasses import dataclass
 
 from contrapartes.models import StatusHabilitacao
 
-#: Etapas da validação do perfil. Crédito não entra: depende do valor e pertence
-#: ao contrato (D30).
+#: Etapas da validação do perfil, na ordem da esteira (AGENTS.md D29, D30).
 ETAPAS_DO_PERFIL = [
     (StatusHabilitacao.AGUARDANDO_DOCUMENTOS, "Documentos base"),
     (StatusHabilitacao.EM_ANALISE_DOCUMENTAL, "Conferência dos documentos"),
     (StatusHabilitacao.EM_COMPLIANCE, "Due diligence (Compliance)"),
+    (StatusHabilitacao.EM_CREDITO, "Análise de crédito"),
     (StatusHabilitacao.HABILITADA, "Perfil validado"),
 ]
 
