@@ -46,7 +46,8 @@ documento já analisado contar como "em análise" em vez de pendência.
   conteúdo. Só dados fictícios (AGENTS.md §5.1).
 - Integração externa só atrás de interface em `integracoes/`, e sempre via task Celery.
   `ProvedorIA` é agnóstica: um provedor local entra depois (AGENTS.md §7, D16).
-- Data `31/07/2026` e valor `R$ 1.234,56`, sempre por filtro de template único.
+- Data `31/07/2026`, valor `R$ 1.234,56` e CPF/CNPJ `589.747.908-90`, sempre pelos
+  filtros de `operacoes/templatetags/formatacao.py` — nunca remontados na tela.
 - Nenhum segredo no repositório. Nenhum CPF, token ou conteúdo de documento em log.
 - A IA não aprova nem reprova, e não enquadra — decisão é humana e auditada.
 - **Não invente regra de compliance.** Não está no guia? Pergunte.
@@ -191,10 +192,28 @@ tela de login.
 > fundo e escreve `src/static/img/marca.png` e `favicon.ico`. Precisa de Pillow, que **não**
 > está nos requirements — é ferramenta de uma vez só (`pip install pillow` quando precisar).
 
+**Edição do cadastro do perfil** (AGENTS.md D47): `/solicitacoes/<pk>/editar/`. Alterar o
+que os documentos comprovam devolve o perfil ao começo da esteira — documentos aprovados
+voltam para a triagem (arquivos ficam), pareceres concluídos voltam a rascunho. E-mail e
+telefone salvam sem mexer em nada. **Antes de gravar, uma tela de confirmação**
+(`editar_confirmar.html`) mostra o que muda e o que isso desfaz, em números, e exige marcar
+a ciência. **CPF/CNPJ nunca é editável; perfil validado ou cancelado não se edita.** A marca da alteração fica em `Contraparte`
+(`data_alteracao_cadastral`, `alterada_por`, `campos_alterados`) e aparece no detalhe.
+Serviços em `contrapartes/servicos.py`: `alterar_dados_cadastrais` e `reiniciar_validacao`.
+
+**Data de emissão obrigatória** onde o tipo a exige, e **alerta de prazo** quando o
+documento chega vencido — aceita, mas com aviso forte no envio e no kit (AGENTS.md D48).
+O prazo sai de `TipoDocumento.dias_validade`, nunca de constante no código.
+
 **Selo de validação some quando o perfil é cancelado**: vira "Cancelada" em cinza. Mostrar
 "Aguardando documentos" num cadastro encerrado sugeria que alguém ainda esperava algo. A
 regra está em `Solicitacao.situacao_da_validacao`, e `VALIDACAO_NAO_SE_APLICA` entrou no
 mapa de cores como qualquer status.
+
+> **Nada de `—` nem de `·` na tela** (AGENTS.md D49). Dois pontos, vírgula, ponto e vírgula,
+> parênteses e barra dizem o mesmo; valor vazio é `-`. Vale para template, `__str__`,
+> `help_text` e mensagem — não para docstring nem comentário. `tests/test_templates.py`
+> reprova quem esquecer, inclusive em arquivo novo.
 
 > **`{# … #}` é de uma linha só.** O lexer do Django não usa `re.DOTALL`: em duas linhas o
 > "comentário" vira **texto visível na página**, sem erro nenhum. Comentário de várias

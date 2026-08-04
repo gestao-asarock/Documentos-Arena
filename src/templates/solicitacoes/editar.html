@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block titulo %}Editar perfil #{{ solicitacao.pk }} | Documentos Arena{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo"><h1>Editar dados do perfil #{{ solicitacao.pk }}</h1></div>
+
+<section class="cartao cartao--estreito">
+  {% if tem_analise_feita %}
+    {% comment %}
+      O aviso vem antes do formulário, não depois: quem lê só ao chegar no botão
+      já preencheu tudo e vai confirmar por inércia.
+    {% endcomment %}
+    <p class="aviso aviso--atencao aviso--forte" role="alert">
+      <span class="aviso__marca" aria-hidden="true">&#9888;</span>
+      <span class="aviso__corpo">
+        <strong class="aviso__titulo">A validação vai recomeçar</strong>
+        Alterar nome, RG, data de nascimento ou endereço invalida a conferência já
+        feita: os documentos aprovados <strong>voltam para a triagem</strong> e
+        compliance e crédito serão <strong>refeitos</strong>. Os arquivos enviados
+        continuam onde estão; ninguém precisa reenviá-los.<br>
+        Corrigir apenas <strong>e-mail</strong> ou <strong>telefone</strong> não mexe
+        na validação: nenhum documento os comprova.<br>
+        <strong>Nada é gravado direto:</strong> a próxima tela mostra o que muda e o
+        que isso desfaz, e pede sua confirmação.
+      </span>
+    </p>
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    <p class="aviso aviso--erro">{{ form.non_field_errors|join:" " }}</p>
+  {% endif %}
+
+  {% comment %}
+    `novalidate` pelo mesmo motivo do cadastro: campo obrigatório escondido faz o
+    navegador recusar o envio sem mostrar nada. Quem aponta o que falta é o servidor.
+  {% endcomment %}
+  <form method="post" class="formulario" data-url-cep="{% url 'solicitacoes:buscar_cep' %}" novalidate>
+    {% csrf_token %}
+
+    <h2 class="secao-formulario secao-formulario--primeira">Contraparte</h2>
+    {% for campo in form.campos_da_pessoa %}
+      {% include "_campo.html" %}
+      {% if campo.name == form.CAMPOS_PF|last %}
+        <p class="ajuda" data-aviso-pj hidden>{{ form.AVISO_PJ }}</p>
+      {% endif %}
+    {% endfor %}
+
+    <h2 class="secao-formulario">Endereço</h2>
+    {% include "_campo.html" with campo=form.cep %}
+
+    <div class="acoes" data-acao-cep hidden>
+      <button type="button" class="botao botao--discreto" data-preencher-endereco>Preencher endereço</button>
+      <span class="ajuda" data-cep-aviso role="status" aria-live="polite"></span>
+    </div>
+
+    {% comment %}
+      Na edição o endereço já existe e nasce visível: esconder o que a pessoa veio
+      corrigir seria esconder justamente o motivo da visita.
+    {% endcomment %}
+    <div class="campos-endereco" data-endereco-detalhes>
+      {% for campo in form.campos_do_endereco %}
+        {% include "_campo.html" %}
+      {% endfor %}
+    </div>
+
+    <div class="acoes">
+      <button type="submit" class="botao botao--grande">Salvar alterações</button>
+      <a class="botao botao--discreto botao--grande" href="{% url 'solicitacoes:detalhe' solicitacao.pk %}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

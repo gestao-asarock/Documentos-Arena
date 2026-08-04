@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% load formatacao %}
 
-{% block titulo %}Assinatura — Operação #{{ operacao.pk }}{% endblock %}
+{% block titulo %}Assinatura | Operação #{{ operacao.pk }}{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
-  <h1>Contrato #{{ operacao.pk }} — assinatura</h1>
+  <h1>Contrato #{{ operacao.pk }}: assinatura</h1>
   {% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}
 </div>
 
 <section class="cartao">
   <dl class="dados">
     <div><dt>Contraparte</dt><dd>{{ operacao.contraparte.nome }}</dd></div>
-    <div><dt>CPF/CNPJ</dt><dd>{{ operacao.contraparte.documento }}</dd></div>
+    <div><dt>CPF/CNPJ</dt><dd>{{ operacao.contraparte.documento|cpf_cnpj }}</dd></div>
     <div><dt>Evento</dt><dd>{{ operacao.descricao }}</dd></div>
     <div><dt>Data</dt><dd>{{ operacao.data_evento|data_br }}{% if operacao.horario_evento %} às {{ operacao.horario_evento|time:"H:i" }}{% endif %}</dd></div>
     <div><dt>Valor</dt><dd>{{ operacao.valor_total|moeda }}</dd></div>
@@ -39,7 +39,7 @@
           <span class="estado estado--andamento">&#9679; Pendente</span>
         {% endif %}
         <strong>{{ checagem.titulo }}</strong>
-        {% if checagem.responsavel and checagem.responsavel != "—" %}
+        {% if checagem.responsavel and checagem.responsavel != "-" %}
           <small class="ajuda">por {{ checagem.responsavel }}{% if checagem.data %} em {{ checagem.data|data_hora_br }}{% endif %}</small>
         {% endif %}
       </summary>
@@ -60,9 +60,9 @@
     {% if etapa_assinatura.data_decisao %}
       <p class="aviso aviso--sucesso">
         &#10003; <strong>Contrato baixado para assinatura</strong> por
-        {{ etapa_assinatura.decidida_por|default:"—" }} em
+        {{ etapa_assinatura.decidida_por|default:"-" }} em
         {{ etapa_assinatura.data_decisao|data_hora_br }}.
-        A etapa 5 está concluída — baixar de novo não altera esse registro.
+        A etapa 5 está concluída; baixar de novo não altera esse registro.
       </p>
     {% else %}
       <p class="aviso aviso--sucesso">
@@ -79,7 +79,7 @@
               {{ documento.rotulo }}
               <small class="ajuda">
                 {{ arquivo.nome_original|default:"arquivo" }}
-                {% if arquivo.eh_docx %}— será entregue convertido em PDF{% endif %}
+                {% if arquivo.eh_docx %}(será entregue convertido em PDF){% endif %}
               </small>
             </span>
             <a class="botao" href="{% url 'operacoes:baixar_para_assinatura' operacao.pk arquivo.pk %}">

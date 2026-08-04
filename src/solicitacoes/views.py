@@ -11,13 +11,19 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
-from contrapartes.servicos import avancar_habilitacao
+from contrapartes.servicos import (
+    alterar_dados_cadastrais,
+    avancar_habilitacao,
+    comparar_cadastro,
+    efeitos_da_revalidacao,
+    reiniciar_validacao,
+)
 from documentos.models import StatusDocumento
 from integracoes.enderecos import buscar_por_cep
 from operacoes.permissoes import eh_dono_ou_interno, pode_cancelar, pode_criar_operacao
 
 from . import fluxo as fluxo_do_processo
-from .forms import EnvioDocumentoForm, SolicitacaoForm
+from .forms import EdicaoPerfilForm, EnvioDocumentoForm, SolicitacaoForm
 from .models import Solicitacao
 from .servicos import abrir_habilitacao, obter_ou_criar_contraparte, solicitacoes_visiveis_para
 
@@ -59,6 +65,105 @@ def nova(request):
 
 
 @login_required
+def editar(request, pk: int):
+    """Corrige os dados cadastrais do perfil (AGENTS.md D47).
+
+    Alterar o que os documentos comprovam devolve o perfil ao começo da
+    esteira: o que foi conferido antes atestava os dados antigos. A tela avisa
+    disso antes de gravar, e a confirmação é explícita.
+    """
+    solicitacao = get_object_or_404(solicitacoes_visiveis_para(request.user), pk=pk)
+    if not eh_dono_ou_interno(request.user, solicitacao):
+        raise PermissionDenied
+    if not solicitacao.pode_ser_editada:
+        messages.error(
+            request,
+            "Perfil validado ou cancelado não pode ter os dados alterados."
+            if not solicitacao.esta_cancelada
+            else "Perfil cancelado não pode ter os dados alterados.",
+        )
+        return redirect("solicitacoes:detalhe", pk=pk)
+
+    contraparte = solicitacao.contraparte
+    form = EdicaoPerfilForm(
+        request.POST or None, initial=EdicaoPerfilForm.dados_iniciais(contraparte)
+    )
+
+    # "Voltar e corrigir" na confirmação: devolve o formulário com o que foi
+    # digitado, em vez de recarregar o que está no banco.
+    if request.method == "POST" and request.POST.get("voltar"):
+        return render(
+            request,
+            "solicitacoes/editar.html",
+            {
+                "solicitacao": solicitacao,
+                "contraparte": contraparte,
+                "form": form,
+                "tem_analise_feita": contraparte.documentos_cadastrais.exists(),
+            },
+        )
+
+    if request.method == "POST" and form.is_valid():
+        previa = comparar_cadastro(contraparte, form.dados_da_contraparte)
+
+        if not previa:
+            messages.info(request, "Nada foi alterado.")
+            return redirect("solicitacoes:detalhe", pk=pk)
+
+        # Alteração que derruba a conferência passa por uma confirmação própria,
+        # que mostra o que muda e o que isso desfaz. Só depois dela se grava: o
+        # efeito é grande demais para caber num aviso lido depois do fato.
+        veio_da_confirmacao = bool(request.POST.get("confirmado"))
+        if previa.exige_revalidacao and not (veio_da_confirmacao and request.POST.get("ciente")):
+            return render(
+                request,
+                "solicitacoes/editar_confirmar.html",
+                {
+                    "solicitacao": solicitacao,
+                    "contraparte": contraparte,
+                    "form": form,
+                    "previa": previa,
+                    "efeitos": efeitos_da_revalidacao(solicitacao.habilitacao),
+                    # Só é falta de ciência se a pessoa já esteve nesta tela e
+                    # mandou sem marcar; da primeira vez, é só a tela abrindo.
+                    "faltou_ciencia": veio_da_confirmacao,
+                },
+            )
+
+        alteracao = alterar_dados_cadastrais(
+            contraparte, form.dados_da_contraparte, usuario=request.user
+        )
+
+        if alteracao.exige_revalidacao:
+            reiniciar_validacao(
+                solicitacao.habilitacao,
+                usuario=request.user,
+                motivo=f"cadastro alterado: {alteracao.resumo}",
+            )
+            messages.warning(
+                request,
+                f"Dados alterados ({alteracao.resumo}). A validação recomeçou: "
+                "os documentos voltaram para a triagem e as análises serão refeitas.",
+            )
+        else:
+            messages.success(request, f"Dados alterados ({alteracao.resumo}).")
+
+        return redirect("solicitacoes:detalhe", pk=pk)
+
+    return render(
+        request,
+        "solicitacoes/editar.html",
+        {
+            "solicitacao": solicitacao,
+            "contraparte": contraparte,
+            "form": form,
+            # A tela só avisa que a validação recomeça se houver o que recomeçar.
+            "tem_analise_feita": contraparte.documentos_cadastrais.exists(),
+        },
+    )
+
+
+@login_required
 def detalhe(request, pk: int):
     solicitacao = get_object_or_404(solicitacoes_visiveis_para(request.user), pk=pk)
 
@@ -81,6 +186,8 @@ def detalhe(request, pk: int):
             "fluxo": fluxo_do_processo.montar(solicitacao),
             "pode_cancelar": solicitacao.pode_ser_cancelada
             and pode_cancelar(request.user, solicitacao),
+            "pode_editar": solicitacao.pode_ser_editada
+            and eh_dono_ou_interno(request.user, solicitacao),
             "exigencias": solicitacao.exigencias_cadastrais(),
             "pendencias": pendencias,
             "kit": solicitacao.contraparte.situacao_do_kit(),
@@ -145,7 +252,18 @@ def enviar_documento(request, pk: int):
         usuario=request.user,
     )
 
-    messages.success(request, f"{documento.rotulo} enviado. Aguardando análise.")
+    # Documento fora do prazo entra assim mesmo — barrar o envio deixaria o
+    # Clube sem caminho —, mas ninguém pode descobrir isso só na triagem
+    # (AGENTS.md D48).
+    if documento.esta_vencido:
+        messages.warning(
+            request,
+            f"{documento.rotulo} enviado, mas está fora do prazo: emitido há "
+            f"{documento.dias_desde_emissao} dias, e vale {documento.tipo.dias_validade}. "
+            "A triagem provavelmente vai pedir um mais recente.",
+        )
+    else:
+        messages.success(request, f"{documento.rotulo} enviado. Aguardando análise.")
     return redirect("solicitacoes:detalhe", pk=pk)
 
 

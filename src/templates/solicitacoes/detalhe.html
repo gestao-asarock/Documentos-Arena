@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load formatacao %}
 
-{% block titulo %}Perfil #{{ solicitacao.pk }} — Documentos Arena{% endblock %}
+{% block titulo %}Perfil #{{ solicitacao.pk }} | Documentos Arena{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
@@ -22,7 +22,7 @@
     {% for operacao in contraparte.operacoes.all %}
       <p class="contrato-do-perfil">
         <a class="botao botao--discreto" href="{% url 'operacoes:detalhe' operacao.pk %}">
-          Contrato #{{ operacao.pk }} — {{ operacao.descricao }}
+          Contrato #{{ operacao.pk }}: {{ operacao.descricao }}
         </a>
         {% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}
         <a class="ajuda" href="{% url 'operacoes:assinatura' operacao.pk %}">ver checagens</a>
@@ -32,21 +32,37 @@
 </section>
 
 <section class="cartao">
-  <h2>Dados do perfil</h2>
+  <div class="pagina__topo">
+    <h2>Dados do perfil</h2>
+    {% if pode_editar %}
+      <a class="botao botao--discreto" href="{% url 'solicitacoes:editar' solicitacao.pk %}">Editar dados</a>
+    {% elif not solicitacao.esta_cancelada %}
+      <span class="ajuda">Perfil validado: os dados não podem mais ser alterados.</span>
+    {% endif %}
+  </div>
   <dl class="dados">
     <div><dt>Contraparte</dt><dd>{{ contraparte.nome }}</dd></div>
-    <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento }} <small class="ajuda">{{ contraparte.get_tipo_pessoa_display }}</small></dd></div>
+    <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento|cpf_cnpj }} <small class="ajuda">{{ contraparte.get_tipo_pessoa_display }}</small></dd></div>
     {% if contraparte.data_nascimento %}<div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>{% endif %}
     {% if contraparte.rg %}<div><dt>RG</dt><dd>{{ contraparte.rg }}</dd></div>{% endif %}
     {% if contraparte.endereco %}<div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>{% endif %}
     {% if contraparte.email %}<div><dt>E-mail</dt><dd>{{ contraparte.email }}</dd></div>{% endif %}
     <div><dt>Cadastrado por</dt><dd>{{ solicitacao.criada_por }} em {{ solicitacao.data_criacao|data_hora_br }}</dd></div>
+    {% if contraparte.data_alteracao_cadastral %}
+      <div>
+        <dt>Dados alterados</dt>
+        <dd>
+          {{ contraparte.alterada_por|default:"-" }} em {{ contraparte.data_alteracao_cadastral|data_hora_br }}
+          <small class="ajuda">{{ contraparte.campos_alterados }}. A validação foi refeita a partir daí.</small>
+        </dd>
+      </div>
+    {% endif %}
   </dl>
 
   {% if contraparte.parte_relacionada %}
     <p class="aviso aviso--atencao">
       &#9888; Contraparte marcada como <strong>parte relacionada</strong>.
-      Governança específica em discussão — não altera a alçada.
+      Governança específica em discussão; não altera a alçada.
     </p>
   {% endif %}
 </section>
@@ -93,7 +109,12 @@
         <li class="lista-kit__item">
           <span class="estado estado--erro">&#10007; {{ documento.get_status_display }}</span>
           <span class="lista-kit__nome">
-            {{ documento.rotulo }}{% if documento.esta_vencido %} — vencido{% endif %}
+            {{ documento.rotulo }}
+            {% if documento.esta_vencido %}
+              <strong>(fora do prazo)</strong>:
+              emitido há {{ documento.dias_desde_emissao }} dias, vale {{ documento.tipo.dias_validade }}.
+              Envie um mais recente.
+            {% endif %}
             {% if documento.observacao %}
               <small class="motivo">Motivo: {{ documento.observacao }}</small>
             {% endif %}
@@ -165,7 +186,7 @@
                     {{ arquivo.nome_original|default:"arquivo" }}
                   </a>
                 </div>
-              {% empty %}—{% endfor %}
+              {% empty %}-{% endfor %}
             </td>
             <td>{% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}</td>
             <td>{{ documento.data_emissao|data_br }}</td>
@@ -175,7 +196,7 @@
                 {% if documento.esta_vencido %}<span class="estado estado--atencao">&#9888; vencido</span>{% endif %}
               {% else %}não vence{% endif %}
             </td>
-            <td>{{ documento.enviado_por|default:"—" }} <small class="ajuda">{{ documento.data_envio|data_hora_br }}</small></td>
+            <td>{{ documento.enviado_por|default:"-" }} <small class="ajuda">{{ documento.data_envio|data_hora_br }}</small></td>
             <td class="tabela__acoes">{% include "solicitacoes/_excluir_documento.html" %}</td>
           </tr>
         {% endfor %}
@@ -189,7 +210,7 @@
 {% if solicitacao.esta_cancelada %}
   <section class="cartao">
     <p class="aviso aviso--erro">
-      &#10007; <strong>Perfil cancelado</strong> por {{ solicitacao.cancelada_por|default:"—" }}
+      &#10007; <strong>Perfil cancelado</strong> por {{ solicitacao.cancelada_por|default:"-" }}
       em {{ solicitacao.data_cancelamento|data_hora_br }}.
       {% if solicitacao.motivo_cancelamento %}<br>Motivo: {{ solicitacao.motivo_cancelamento }}{% endif %}
     </p>

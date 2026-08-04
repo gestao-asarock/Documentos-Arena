@@ -47,7 +47,7 @@ def _do_perfil(habilitacao: Habilitacao | None) -> list[Checagem]:
         return [Checagem("Perfil da contraparte", PENDENTE, detalhe="Perfil não validado.")]
 
     aprovados = [
-        f"{d.rotulo} — {d.get_status_display()}"
+        f"{d.rotulo}: {d.get_status_display()}"
         for d in habilitacao.contraparte.documentos_cadastrais.select_related("tipo", "subtipo")
         if d.status == StatusDocumento.APROVADO
     ]
@@ -70,9 +70,9 @@ def _do_perfil(habilitacao: Habilitacao | None) -> list[Checagem]:
             Checagem(
                 "Due diligence (Compliance)",
                 CONCLUIDA,
-                responsavel=str(parecer.analista or "—"),
+                responsavel=str(parecer.analista or "-"),
                 data=parecer.data_conclusao,
-                detalhe=f"{parecer.get_veredito_display()} — {parecer.justificativa}",
+                detalhe=f"{parecer.get_veredito_display()}. {parecer.justificativa}",
                 itens=[f"{rotulo}: {texto}" for rotulo, texto in parecer.blocos_preenchidos()],
             )
         )
@@ -105,9 +105,9 @@ def _credito_do_perfil(habilitacao: Habilitacao) -> Checagem:
     return Checagem(
         "Risco e crédito (perfil)",
         CONCLUIDA,
-        responsavel=str(parecer.analista or "—"),
+        responsavel=str(parecer.analista or "-"),
         data=parecer.data_conclusao,
-        detalhe=f"{parecer.get_veredito_display()} — {parecer.justificativa}",
+        detalhe=f"{parecer.get_veredito_display()}. {parecer.justificativa}",
         itens=[f"{rotulo}: {texto}" for rotulo, texto in parecer.blocos_preenchidos()],
     )
 
@@ -116,10 +116,10 @@ def _documentos_do_contrato(operacao) -> Checagem:
     """Estado real da documentação: aprovada, em conferência, ou faltando."""
     situacao = operacao.situacao_documental()
 
-    itens = [f"{d.rotulo} — {d.get_status_display()}" for d in situacao["aprovados"]]
-    itens += [f"{d.rotulo} — em conferência" for d in situacao["em_analise"]]
-    itens += [f"{d.rotulo} — {d.get_status_display()}" for d in situacao["com_problema"]]
-    itens += [f"{tipo.nome} — não enviado" for tipo in situacao["faltando"]]
+    itens = [f"{d.rotulo}: {d.get_status_display()}" for d in situacao["aprovados"]]
+    itens += [f"{d.rotulo}: em conferência" for d in situacao["em_analise"]]
+    itens += [f"{d.rotulo}: {d.get_status_display()}" for d in situacao["com_problema"]]
+    itens += [f"{tipo.nome}: não enviado" for tipo in situacao["faltando"]]
 
     if not operacao.documentos_exigidos():
         return Checagem(

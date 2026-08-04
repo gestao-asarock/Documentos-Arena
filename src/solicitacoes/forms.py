@@ -6,8 +6,10 @@ para o Clube é um pedido só. A separação em entidades é problema nosso.
 """
 
 from django import forms
+from django.utils import timezone
 
 from contrapartes.models import deduzir_tipo_pessoa
+from contrapartes.servicos import CAMPOS_PROVADOS_POR_DOCUMENTO
 from documentos.models import SubtipoDocumento, TipoDocumento, TipoPessoa
 from documentos.validadores import ACCEPT_HTML, validar_documento
 
@@ -138,6 +140,28 @@ class SolicitacaoForm(forms.Form):
         """Bloco revelado pelo botão, depois da busca por CEP."""
         return [self[nome] for nome in self.CAMPOS_ENDERECO]
 
+    #: Ordem em que os campos são lidos da contraparte para preencher a edição.
+    CAMPOS_DA_CONTRAPARTE = (
+        "nome",
+        "documento",
+        "data_nascimento",
+        "rg",
+        "email",
+        "telefone",
+        "cep",
+        "logradouro",
+        "numero",
+        "complemento",
+        "bairro",
+        "cidade",
+        "uf",
+    )
+
+    @classmethod
+    def dados_iniciais(cls, contraparte) -> dict:
+        """Preenche o formulário com o que já está no cadastro."""
+        return {campo: getattr(contraparte, campo) for campo in cls.CAMPOS_DA_CONTRAPARTE}
+
     @property
     def endereco_preenchido(self) -> bool:
         """Já há endereço na tela? Então ele nasce visível, sem depender do JS.
@@ -150,21 +174,34 @@ class SolicitacaoForm(forms.Form):
     @property
     def dados_da_contraparte(self) -> dict:
         """Campos que pertencem à contraparte, não à solicitação."""
-        campos = (
-            "nome",
-            "data_nascimento",
-            "rg",
-            "email",
-            "telefone",
-            "cep",
-            "logradouro",
-            "numero",
-            "complemento",
-            "bairro",
-            "cidade",
-            "uf",
-        )
+        campos = (campo for campo in self.CAMPOS_DA_CONTRAPARTE if campo != "documento")
         return {campo: self.cleaned_data.get(campo) for campo in campos}
+
+
+class EdicaoPerfilForm(SolicitacaoForm):
+    """Mesmo formulário do cadastro, com o CPF/CNPJ travado (AGENTS.md D47).
+
+    O documento é a identidade da contraparte e a chave que faz o dossiê ser
+    reaproveitado entre perfis e contratos. Corrigi-lo aqui trocaria a pessoa
+    por baixo de tudo que já aponta para ela. Digitou errado: cancele o perfil
+    e cadastre de novo.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # `disabled` não confia no HTML: o Django ignora o que vier no POST e
+        # usa o valor inicial, então nem adulterando o formulário se troca.
+        self.fields["documento"].disabled = True
+        self.fields["documento"].help_text = (
+            "Não pode ser alterado: é a identidade da contraparte. "
+            "Se estiver errado, cancele este perfil e cadastre outro."
+        )
+
+        # Marca os campos que os documentos comprovam. O JS só pede confirmação
+        # quando um deles muda de fato — trocar o telefone não merece susto.
+        for campo in CAMPOS_PROVADOS_POR_DOCUMENTO:
+            if campo in self.fields:
+                self.fields[campo].widget.attrs["data-invalida-validacao"] = "true"
 
 
 class EnvioDocumentoForm(forms.Form):
@@ -193,10 +230,13 @@ class EnvioDocumentoForm(forms.Form):
         label="Arquivos",
         help_text="PDF, JPG ou PNG, até 25 MB cada. Pode enviar frente e verso juntos.",
     )
+    # Obrigatória quando o tipo a exige — a checagem fica no `clean`, porque só
+    # ali se sabe qual tipo foi escolhido. Sem ela, um comprovante de residência
+    # de três anos atrás entrava como se estivesse em dia (AGENTS.md D48).
     data_emissao = DataBRField(
         label="Data de emissão",
         required=False,
-        help_text="Usada para calcular a validade.",
+        help_text="É ela que define até quando o documento vale.",
     )
 
     def __init__(self, *args, tipos_pendentes=None, **kwargs):
@@ -242,5 +282,15 @@ class EnvioDocumentoForm(forms.Form):
         # A emissão do RG não define validade alguma; não faz sentido pedir.
         if not tipo.exige_data_emissao:
             dados["data_emissao"] = None
+            return dados
+
+        emissao = dados.get("data_emissao")
+        if emissao is None:
+            self.add_error(
+                "data_emissao",
+                f"Informe a data de emissão: é ela que define até quando {tipo.nome.lower()} vale.",
+            )
+        elif emissao > timezone.localdate():
+            self.add_error("data_emissao", "A data de emissão não pode estar no futuro.")
 
         return dados

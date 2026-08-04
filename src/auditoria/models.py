@@ -16,6 +16,7 @@ class Acao(models.TextChoices):
     ENQUADRAMENTO = "enquadramento", "Enquadramento"
     ENVIO_DOCUMENTO = "envio_documento", "Envio de documento"
     EXCLUSAO_DOCUMENTO = "exclusao_documento", "Exclusão de documento"
+    ALTERACAO_CADASTRAL = "alteracao_cadastral", "Alteração cadastral"
     ANALISE_IA = "analise_ia", "Análise por IA"
     CONSULTA_COMPLIANCE = "consulta_compliance", "Consulta de compliance"
     TRANSICAO_ESTADO = "transicao_estado", "Transição de estado"
@@ -51,4 +52,4 @@ class EventoAuditoria(models.Model):
         indexes = [models.Index(fields=("content_type", "object_id"))]
 
     def __str__(self) -> str:
-        return f"{self.get_acao_display()} — {self.descricao}"
+        return f"{self.get_acao_display()}: {self.descricao}"

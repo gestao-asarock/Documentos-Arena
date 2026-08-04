@@ -122,7 +122,7 @@ class ParecerCredito(models.Model):
 
     def __str__(self) -> str:
         alcance = self.regra.criterio if self.regra_id else "perfil"
-        return f"Crédito — {self.contraparte.nome} ({alcance})"
+        return f"Crédito: {self.contraparte.nome} ({alcance})"
 
     @property
     def esta_concluido(self) -> bool:
@@ -170,4 +170,4 @@ class EvidenciaCredito(models.Model):
         ordering = ("bloco", "data_envio")
 
     def __str__(self) -> str:
-        return f"{self.get_bloco_display()} — {self.nome_original or self.arquivo.name}"
+        return f"{self.get_bloco_display()}: {self.nome_original or self.arquivo.name}"

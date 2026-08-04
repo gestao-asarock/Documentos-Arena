@@ -65,7 +65,7 @@ class Solicitacao(models.Model):
         ordering = ("-data_criacao",)
 
     def __str__(self) -> str:
-        return f"Perfil #{self.pk} — {self.contraparte.nome}"
+        return f"Perfil #{self.pk}: {self.contraparte.nome}"
 
     def pendencias_cadastrais(self):
         """Documentos base que faltam. Sem valor: o kit do perfil não depende de operação."""
@@ -106,6 +106,20 @@ class Solicitacao(models.Model):
         return self.contraparte.operacoes.exclude(
             status__in=["cancelada", "concluida", "reprovada", "dispensada"]
         )
+
+    @property
+    def pode_ser_editada(self) -> bool:
+        """Cadastro validado não se altera (AGENTS.md D47).
+
+        Depois que compliance e crédito concluíram, os dados são a base de uma
+        decisão tomada. Mudá-los faria a validação passar a atestar coisa
+        diferente da que foi analisada — e o perfil já pode estar sustentando
+        contrato. Para corrigir dado de contraparte validada, o caminho é uma
+        revalidação explícita, que ainda não existe.
+        """
+        if self.esta_cancelada:
+            return False
+        return not self.contraparte.esta_habilitada
 
     @property
     def pode_ser_cancelada(self) -> bool:

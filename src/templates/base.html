@@ -9,8 +9,8 @@
   {# Incremente o ?v= ao editar CSS ou JS: sem isso o navegador serve a versão antiga. #}
   <link rel="stylesheet" href="{% static 'css/base.css' %}?v=10">
   {# HTMX entra quando a primeira tela precisar (upload, polling de análise). #}
-  {# Baixe htmx.min.js para src/static/js/ — nada de CDN, o servidor é privado. #}
-  <script src="{% static 'js/formulario.js' %}?v=6" defer></script>
+  {# Baixe htmx.min.js para src/static/js/. Nada de CDN: o servidor é privado. #}
+  <script src="{% static 'js/formulario.js' %}?v=8" defer></script>
 </head>
 <body>
   {% if user.is_authenticated %}

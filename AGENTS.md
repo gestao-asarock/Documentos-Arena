@@ -748,6 +748,49 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   tabuleiro cinza no cabeçalho e na aba. `docs/marca/gerar.py` recorta o fundo e produz
   `src/static/img/marca.png` e `favicon.ico`. Fonte e script ficam versionados; **não edite
   os derivados à mão** — troque o original e rode o script.
+- **D47 — Editar o cadastro reinicia a validação, e perfil validado não se edita.**
+  Decisão de 04/08/2026. Os dados declarados são a **base da conferência**: a triagem
+  compara o RG e o comprovante contra eles. Mudá-los depois faz o parecer atestar coisa
+  diferente da que foi analisada. Portanto:
+  - **Perfil validado (`HABILITADA`) ou cancelado não pode ser alterado.** Ele já pode
+    estar sustentando contrato. Corrigir dado de contraparte validada exige uma
+    revalidação explícita, que ainda não existe — pergunte antes de inventar.
+  - **O CPF/CNPJ nunca é editável**, em nenhum estado. É a identidade da contraparte e a
+    chave do reaproveitamento do dossiê entre perfis e contratos; trocá-lo mudaria a
+    pessoa por baixo de tudo que já aponta para ela. Digitou errado: cancele e cadastre.
+  - **Só os campos que os documentos comprovam** reiniciam a validação — nome, RG,
+    nascimento e endereço (`CAMPOS_PROVADOS_POR_DOCUMENTO`). E-mail e telefone salvam
+    direto: nenhum documento os atesta, e refazer compliance por um telefone é custo sem
+    ganho.
+  - **Reiniciar não apaga arquivo.** Documento aprovado volta a `ENVIADO` e reentra na
+    fila da triagem; pareceres concluídos voltam a rascunho **com o texto e as evidências
+    de pé**, para quem revisar corrigir em vez de redigitar nove blocos.
+  - **A gravação passa por uma tela de confirmação**, no servidor, não por um
+    `window.confirm`. Ela mostra **o que muda** (campo, como está, como fica) e **o que
+    isso desfaz**, em números: de que etapa o perfil sai, quantos documentos perdem a
+    aprovação, quais pareceres voltam a rascunho. Exige marcar a ciência para seguir, e
+    "Voltar e corrigir" devolve o formulário com o que foi digitado. Confirmação de efeito
+    grande é etapa do fluxo, não caixa de diálogo do navegador: precisa funcionar sem JS,
+    ser legível e caber na auditoria. Alteração só de contato grava direto, sem essa tela.
+  - A alteração fica **marcada na contraparte** (`data_alteracao_cadastral`,
+    `alterada_por`, `campos_alterados`) — é o que explica na triagem por que um documento
+    já aprovado voltou para a fila. `data_atualizacao` não serve: ela muda a cada `save()`.
+- **D48 — Data de emissão obrigatória onde ela define validade, e alerta de prazo.**
+  Decisão de 04/08/2026. Quando o tipo tem `exige_data_emissao`, o envio **não passa sem
+  a data** — sem ela um comprovante de residência de três anos entrava como se estivesse
+  em dia, e a vigência do dossiê virava ficção. Data no futuro é recusada. Documento **fora
+  do prazo é aceito**, com alerta forte no envio e na tela: barrar deixaria o Clube sem
+  caminho, e quem decide se aceita assim mesmo é a triagem. O prazo vem de
+  `TipoDocumento.dias_validade` (90 dias para comprovante de residência) — **nunca escreva
+  90 no código**.
+- **D49 — Travessão e ponto médio não entram na interface.** Decisão de 04/08/2026.
+  Nada de `—` nem de `·` em texto que chega à tela: título, rótulo, `help_text`, `__str__`,
+  mensagem, nome de tipo em tabela. Use pontuação comum, que diz o mesmo: dois pontos para
+  identificar (`Perfil #5: Fulano`), vírgula ou ponto e vírgula dentro da frase, parênteses
+  para aposto, barra entre cidade e UF, `|` em título de aba. Para **valor vazio**, hífen
+  (`-`). Docstring e comentário ficam de fora: são texto para quem lê o código.
+  `tests/test_templates.py` varre os templates e, pelo `ast`, as strings do Python que não
+  são docstring — o que passa a valer também para o código que ainda não existe.
 - **D1 — Django em vez de FastAPI.** O Django Admin dá ao jurídico e ao compliance uma
   interface de revisão sem que a construamos, e permite editar a tabela de regras.
   Preserve isso: mantenha os modelos registrados e utilizáveis no Admin.
@@ -926,12 +969,18 @@ infraestrutura. `DJANGO_SETTINGS_MODULE` é `arena.settings`, e o `manage.py` in
 
 ### Formatação brasileira
 
-Toda data e todo valor exibidos seguem o padrão nacional: **`31/07/2026`** e
-**`R$ 1.234,56`** — separador de milhar por ponto, decimal por vírgula, sempre duas casas.
-Data com hora: `31/07/2026 14:30`.
+Toda data, todo valor e todo CPF/CNPJ exibidos seguem o padrão nacional: **`31/07/2026`**,
+**`R$ 1.234,56`** — separador de milhar por ponto, decimal por vírgula, sempre duas casas —
+e **`589.747.908-90`** / **`00.000.000/0001-91`**. Data com hora: `31/07/2026 14:30`.
 
-Use um **filtro de template único** para cada caso (`|moeda`, `|data_br`), definido uma vez
-em `templatetags`. Não formate valor no meio da view, não use `f"R$ {valor}"` espalhado
+O documento é **guardado só com dígitos**, de propósito: é assim que se procura e se
+compara sem depender de quem digitou com ponto. A pontuação é assunto de exibição.
+
+Use um **filtro de template único** para cada caso (`|moeda`, `|data_br`, `|cpf_cnpj`),
+definido uma vez em `templatetags`. Quando o valor é montado em Python para uma tela de
+conferência (`operacoes/conferencia.py`, `analise/views.py`), **chame o mesmo filtro como
+função** — nunca reescreva o formato. Não formate valor no meio da view, não use
+`f"R$ {valor}"` espalhado
 pelo código e não confie no locale do servidor, que pode variar entre a EC2 e a máquina
 local. Na entrada de dados, aceite o que o usuário digitar no padrão brasileiro e converta
 para `Decimal` num único ponto do código.

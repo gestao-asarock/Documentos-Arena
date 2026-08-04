@@ -79,7 +79,7 @@ def test_o_contrato_exige_o_termo_de_adesao():
     subtipos = {s.nome for s in tipo.subtipos.all()}
 
     assert "Termo de Adesão (preenchido)" in subtipos
-    assert "Contrato de cessão — modelo base" in subtipos
+    assert "Contrato de cessão (modelo base)" in subtipos
 
 
 def test_campos_conferidos_incluem_o_que_muda_o_negocio(contrato):

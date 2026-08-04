@@ -101,7 +101,7 @@ class RegraEnquadramento(models.Model):
         ordering = ("tipo_operacao__nome", "valor_minimo")
 
     def __str__(self) -> str:
-        return f"{self.tipo_operacao} — {self.criterio}"
+        return f"{self.tipo_operacao}: {self.criterio}"
 
     def clean(self):
         if self.valor_maximo is not None and self.valor_maximo < self.valor_minimo:
@@ -215,7 +215,7 @@ class Operacao(models.Model):
         ordering = ("-data_criacao",)
 
     def __str__(self) -> str:
-        return f"#{self.pk} {self.tipo_operacao} — {self.contraparte.nome}"
+        return f"#{self.pk} {self.tipo_operacao}: {self.contraparte.nome}"
 
     # -- Regras de imutabilidade (AGENTS.md §6, D13) -------------------------
 
@@ -412,7 +412,7 @@ class EtapaAprovacao(models.Model):
         ordering = ("operacao", "id")
 
     def __str__(self) -> str:
-        return f"{self.get_etapa_display()} — {self.get_status_display()}"
+        return f"{self.get_etapa_display()}: {self.get_status_display()}"
 
     @property
     def papel_responsavel(self) -> str:

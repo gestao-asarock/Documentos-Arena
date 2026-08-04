@@ -12,4 +12,4 @@ class UsuarioAdmin(UserAdmin):
 
     @admin.display(description="papéis")
     def papeis(self, obj: Usuario) -> str:
-        return ", ".join(g.name for g in obj.groups.all()) or "—"
+        return ", ".join(g.name for g in obj.groups.all()) or "-"

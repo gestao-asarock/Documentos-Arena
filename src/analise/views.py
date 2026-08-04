@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
+from operacoes.templatetags.formatacao import cpf_cnpj, data_br
 
 from .servicos import aprovar_documento, fila_de_conferencia, pode_conferir, rejeitar_documento
 
@@ -40,11 +41,18 @@ def conferir(request, documento_id: int):
     solicitacao = contraparte.solicitacoes.order_by("-data_criacao").first()
 
     # Enquanto a IA não entra, o confronto é visual: os dados declarados ficam
-    # lado a lado com o documento, para a pessoa comparar.
+    # lado a lado com o documento, para a pessoa comparar. Por isso vão
+    # formatados como aparecem no documento: "58974790890" ao lado de
+    # "589.747.908-90" atrasa a leitura sem necessidade (AGENTS.md §8).
+    #
+    # A data fica de fora quando não existe: `data_br` devolveria o marcador de
+    # vazio, e o filtro no fim desta view o deixaria passar como dado declarado.
+    nascimento = data_br(contraparte.data_nascimento) if contraparte.data_nascimento else ""
+
     declarados = [
         ("Nome", contraparte.nome),
-        ("CPF/CNPJ", contraparte.documento),
-        ("Data de nascimento", contraparte.data_nascimento),
+        ("CPF/CNPJ", cpf_cnpj(contraparte.documento)),
+        ("Data de nascimento", nascimento),
         ("RG", contraparte.rg),
         ("Endereço", contraparte.endereco),
     ]

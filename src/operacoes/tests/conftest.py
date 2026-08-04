@@ -42,7 +42,7 @@ def aluguel(db):
     faixas próprias, e misturá-las com os dados reais produziria enquadramento
     ambíguo — que é justamente o que um dos testes verifica.
     """
-    return TipoOperacao.objects.create(nome="Tipo de teste — motor de enquadramento")
+    return TipoOperacao.objects.create(nome="Tipo de teste: motor de enquadramento")
 
 
 @pytest.fixture

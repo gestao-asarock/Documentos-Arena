@@ -89,6 +89,28 @@ class Contraparte(models.Model):
         "Gera alerta para o Compliance; não altera a alçada.",
     )
 
+    # Marca da última alteração cadastral (AGENTS.md D47). `data_atualizacao`
+    # não serve para isto: ela muda a cada `save()`, inclusive nos automáticos.
+    # Estes três campos só se mexem quando alguém edita o cadastro de fato, e
+    # são o que explica na triagem por que um documento já aprovado voltou
+    # para a fila.
+    data_alteracao_cadastral = models.DateTimeField(
+        "última alteração cadastral", null=True, blank=True
+    )
+    alterada_por = models.ForeignKey(
+        "contas.Usuario",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="contrapartes_alteradas",
+    )
+    campos_alterados = models.CharField(
+        "campos alterados",
+        max_length=255,
+        blank=True,
+        help_text="O que mudou na última edição. Só rótulos, nunca o conteúdo.",
+    )
+
     ativa = models.BooleanField(default=True)
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
@@ -113,15 +135,19 @@ class Contraparte(models.Model):
 
     @property
     def endereco(self) -> str:
-        """Endereço em uma linha, para exibição."""
+        """Endereço em uma linha, como se escreve num envelope.
+
+        Vírgula entre as partes, barra entre cidade e UF, e o CEP nomeado no
+        fim. Nada de separador gráfico no meio do endereço.
+        """
         partes = [
             ", ".join(p for p in (self.logradouro, self.numero) if p),
             self.complemento,
             self.bairro,
-            " - ".join(p for p in (self.cidade, self.uf) if p),
-            self.cep,
+            "/".join(p for p in (self.cidade, self.uf) if p),
+            f"CEP {self.cep}" if self.cep else "",
         ]
-        return " · ".join(p for p in partes if p)
+        return ", ".join(p for p in partes if p)
 
     # -- Dossiê cadastral ----------------------------------------------------
 
@@ -287,7 +313,7 @@ class Habilitacao(models.Model):
         ordering = ("-data_criacao",)
 
     def __str__(self) -> str:
-        return f"{self.contraparte.nome} — {self.get_status_display()}"
+        return f"{self.contraparte.nome}: {self.get_status_display()}"
 
     @property
     def esta_vigente(self) -> bool:
@@ -332,7 +358,7 @@ class DocumentoCadastral(models.Model):
 
     def __str__(self) -> str:
         rotulo = self.subtipo or self.tipo
-        return f"{rotulo} — {self.contraparte.nome}"
+        return f"{rotulo}: {self.contraparte.nome}"
 
     def clean(self):
         # Documento complementar (escopo operacional) também pertence ao perfil:
@@ -360,6 +386,17 @@ class DocumentoCadastral(models.Model):
     def esta_vencido(self) -> bool:
         vencimento = self.data_vencimento
         return vencimento is not None and vencimento < timezone.localdate()
+
+    @property
+    def dias_desde_emissao(self) -> int | None:
+        """Idade do documento, para a tela dizer *quanto* passou do prazo.
+
+        "Vencido" sozinho não ajuda quem vai decidir se aceita assim mesmo:
+        um comprovante de 91 dias e um de dois anos são casos diferentes.
+        """
+        if not self.data_emissao:
+            return None
+        return (timezone.localdate() - self.data_emissao).days
 
     @property
     def esta_vigente(self) -> bool:

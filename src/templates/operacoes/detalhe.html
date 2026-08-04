@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load formatacao %}
 
-{% block titulo %}Operação #{{ operacao.pk }} — Documentos Arena{% endblock %}
+{% block titulo %}Operação #{{ operacao.pk }} | Documentos Arena{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
@@ -12,7 +12,7 @@
 <section class="cartao">
   <dl class="dados">
     <div><dt>Contraparte</dt><dd>{{ operacao.contraparte.nome }}</dd></div>
-    <div><dt>CPF/CNPJ</dt><dd>{{ operacao.contraparte.documento }}</dd></div>
+    <div><dt>CPF/CNPJ</dt><dd>{{ operacao.contraparte.documento|cpf_cnpj }}</dd></div>
     <div><dt>Tipo</dt><dd>{{ operacao.tipo_operacao }}</dd></div>
     <div><dt>Valor</dt><dd>{{ operacao.valor_total|moeda }}</dd></div>
     <div><dt>Enquadramento</dt><dd>{{ operacao.regra.criterio|default:"não enquadrada" }}</dd></div>
@@ -22,7 +22,7 @@
   {% if operacao.contraparte.parte_relacionada %}
     <p class="aviso aviso--atencao">
       &#9888; Contraparte marcada como <strong>parte relacionada</strong>.
-      Governança específica em discussão — não altera a alçada.
+      Governança específica em discussão; não altera a alçada.
     </p>
   {% endif %}
 
@@ -70,9 +70,9 @@
             <td>{{ etapa.get_etapa_display }}</td>
             <td>{{ etapa.papel_responsavel }}</td>
             <td>{% include "operacoes/_situacao.html" with status=etapa.status rotulo=etapa.get_status_display %}</td>
-            <td>{{ etapa.decidida_por|default:"—" }}</td>
+            <td>{{ etapa.decidida_por|default:"-" }}</td>
             <td>{{ etapa.data_decisao|data_hora_br }}</td>
-            <td>{{ etapa.parecer|default:"—" }}</td>
+            <td>{{ etapa.parecer|default:"-" }}</td>
           </tr>
         {% endfor %}
       </tbody>
@@ -104,7 +104,7 @@
       {% elif conferencia %}
         <p class="ajuda">
           Confira se o <strong>Termo de Adesão</strong> repete exatamente os dados abaixo.
-          O contrato-mãe é modelo base e não muda entre operações — a análise recai
+          O contrato-mãe é modelo base e não muda entre operações: a análise recai
           sobre o termo.
         </p>
         <table class="tabela tabela--conferencia">
@@ -125,7 +125,7 @@
           </tbody>
         </table>
         <p class="ajuda">
-          Os quadradinhos são só apoio de leitura — não são salvos. O que vale é o
+          Os quadradinhos são só apoio de leitura, não são salvos. O que vale é o
           parecer abaixo, que vai para a auditoria com o seu nome.
         </p>
       {% endif %}
@@ -175,7 +175,7 @@
 
   <p class="ajuda">
     Os documentos base da contraparte já foram validados no perfil. Abaixo, só o que
-    este contrato exige a mais — e que fica guardado no perfil para os próximos.
+    este contrato exige a mais, e que fica guardado no perfil para os próximos.
   </p>
 
   {% if situacao.aprovados %}
@@ -208,7 +208,7 @@
       {% endfor %}
     </ul>
     <p class="ajuda">
-      Já enviado — falta a conferência documental. Enviar não é aprovar: o contrato só
+      Já enviado: falta a conferência documental. Enviar não é aprovar: o contrato só
       avança depois da checagem.
     </p>
   {% endif %}
@@ -220,7 +220,7 @@
         <li class="lista-kit__item">
           <span class="estado estado--erro">&#10007; {{ documento.get_status_display }}</span>
           <span class="lista-kit__nome">
-            {{ documento.rotulo }}{% if documento.esta_vencido %} — vencido{% endif %}
+            {{ documento.rotulo }}{% if documento.esta_vencido %} (vencido){% endif %}
             {% if documento.observacao %}<small class="motivo">Motivo: {{ documento.observacao }}</small>{% endif %}
           </span>
         </li>
@@ -291,7 +291,7 @@
 {% if operacao.status == "cancelada" %}
   <section class="cartao">
     <p class="aviso aviso--erro">
-      &#10007; <strong>Operação cancelada</strong> por {{ operacao.cancelada_por|default:"—" }}
+      &#10007; <strong>Operação cancelada</strong> por {{ operacao.cancelada_por|default:"-" }}
       em {{ operacao.data_cancelamento|data_hora_br }}.
       {% if operacao.motivo_cancelamento %}<br>Motivo: {{ operacao.motivo_cancelamento }}{% endif %}
     </p>

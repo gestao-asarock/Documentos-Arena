@@ -12,7 +12,7 @@ conferência continua sendo humana (AGENTS.md §5.1).
 
 from dataclasses import dataclass
 
-from .templatetags.formatacao import data_br, moeda
+from .templatetags.formatacao import cpf_cnpj, data_br, moeda
 
 
 @dataclass
@@ -29,7 +29,7 @@ def campos_do_contrato(operacao) -> list[CampoConferencia]:
     contraparte = operacao.contraparte
     campos = [
         CampoConferencia("Nome do contratante", contraparte.nome),
-        CampoConferencia("CPF/CNPJ", contraparte.documento),
+        CampoConferencia("CPF/CNPJ", cpf_cnpj(contraparte.documento)),
     ]
 
     if contraparte.rg:

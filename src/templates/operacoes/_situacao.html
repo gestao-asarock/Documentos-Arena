@@ -1,7 +1,7 @@
 {% load situacao %}{% comment %}
 Selo de situação. Espera `status` (valor bruto) e `rotulo` (texto legível).
 
-A cor vem de um mapa único em `operacoes/templatetags/situacao.py` — não escreva
+A cor vem de um mapa único em `operacoes/templatetags/situacao.py`. Não escreva
 cor de estado direto no template (AGENTS.md §8).
 {% endcomment %}
 <span class="estado estado--{{ status|familia }}">{{ status|simbolo }} {{ rotulo }}</span>

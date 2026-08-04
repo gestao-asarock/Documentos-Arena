@@ -4,11 +4,14 @@ Envio de documentos e validação de arquivo (AGENTS.md §5.4, D18).
 Extensão é sugestão do usuário; o que vale é a assinatura dos primeiros bytes.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 
 from contas.models import Papel, Usuario
 from contrapartes.models import DocumentoCadastral
@@ -25,6 +28,16 @@ PNG = b"\x89PNG\r\n\x1a\n conteudo ficticio"
 
 def _arquivo(nome: str, conteudo: bytes) -> SimpleUploadedFile:
     return SimpleUploadedFile(nome, conteudo)
+
+
+def _emissao(dias_atras: int = 10) -> str:
+    """Data de emissão no formato da tela, relativa a hoje (AGENTS.md D48).
+
+    Relativa de propósito: uma data fixa no código passaria a estar vencida
+    sozinha com o tempo, e o teste começaria a falhar sem ninguém ter mexido
+    em nada.
+    """
+    return (timezone.localdate() - timedelta(days=dias_atras)).strftime("%d/%m/%Y")
 
 
 @pytest.fixture
@@ -167,7 +180,11 @@ def test_envio_cria_documento_e_reduz_pendencias(client, usuario_clube, solicita
 
     resposta = client.post(
         reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
-        {"tipo": tipo.id, "arquivos": [_arquivo("documento.pdf", PDF)], "data_emissao": ""},
+        {
+            "tipo": tipo.id,
+            "arquivos": [_arquivo("documento.pdf", PDF)],
+            "data_emissao": _emissao(),
+        },
     )
 
     assert resposta.status_code == 302
@@ -244,12 +261,12 @@ def test_data_em_formato_brasileiro(client, usuario_clube, solicitacao):
         {
             "tipo": tipo.id,
             "arquivos": [_arquivo("comprovante.pdf", PDF)],
-            "data_emissao": "24/08/2026",
+            "data_emissao": _emissao(dias_atras=11),
         },
     )
 
     documento = DocumentoCadastral.objects.get(contraparte=solicitacao.contraparte)
-    assert documento.data_emissao.isoformat() == "2026-08-24"
+    assert documento.data_emissao == timezone.localdate() - timedelta(days=11)
 
 
 def test_um_arquivo_invalido_barra_o_envio_inteiro(client, usuario_clube, solicitacao):
@@ -287,13 +304,87 @@ def test_documento_enviado_sai_de_faltando_e_entra_em_analise(client, usuario_cl
 
     client.post(
         reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
-        {"tipo": tipo.id, "arquivos": [_arquivo("comprovante.pdf", PDF)]},
+        {
+            "tipo": tipo.id,
+            "arquivos": [_arquivo("comprovante.pdf", PDF)],
+            "data_emissao": _emissao(),
+        },
     )
 
     kit = solicitacao.contraparte.situacao_do_kit()
 
     assert tipo not in kit["faltando"]
     assert [d.tipo for d in kit["em_analise"]] == [tipo]
+
+
+def test_emissao_e_obrigatoria_onde_define_validade(client, usuario_clube, solicitacao):
+    """Sem a data, a vigência do dossiê vira ficção (AGENTS.md D48)."""
+    client.force_login(usuario_clube)
+    tipo = _tipo_simples(solicitacao)
+
+    client.post(
+        reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
+        {"tipo": tipo.id, "arquivos": [_arquivo("comprovante.pdf", PDF)], "data_emissao": ""},
+    )
+
+    assert not DocumentoCadastral.objects.exists()
+
+
+def test_emissao_no_futuro_e_recusada(client, usuario_clube, solicitacao):
+    client.force_login(usuario_clube)
+    tipo = _tipo_simples(solicitacao)
+
+    client.post(
+        reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
+        {
+            "tipo": tipo.id,
+            "arquivos": [_arquivo("comprovante.pdf", PDF)],
+            "data_emissao": _emissao(dias_atras=-1),
+        },
+    )
+
+    assert not DocumentoCadastral.objects.exists()
+
+
+def test_emissao_dispensada_onde_nao_define_validade(client, usuario_clube, solicitacao):
+    """A emissão do RG não define validade alguma: não se pede."""
+    client.force_login(usuario_clube)
+    tipo = _tipo_identificacao(solicitacao)
+
+    client.post(
+        reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
+        {
+            "tipo": tipo.id,
+            "subtipo": tipo.subtipos.get(nome="RG").id,
+            "arquivos": [_arquivo("frente.jpg", JPG)],
+        },
+    )
+
+    assert DocumentoCadastral.objects.get().data_emissao is None
+
+
+def test_documento_fora_do_prazo_entra_com_alerta(client, usuario_clube, solicitacao):
+    """Aceita, mas avisa: barrar deixaria o Clube sem caminho (AGENTS.md D48)."""
+    client.force_login(usuario_clube)
+    tipo = _tipo_simples(solicitacao)
+
+    resposta = client.post(
+        reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
+        {
+            "tipo": tipo.id,
+            "arquivos": [_arquivo("comprovante.pdf", PDF)],
+            "data_emissao": _emissao(dias_atras=tipo.dias_validade + 28),
+        },
+        follow=True,
+    )
+
+    documento = DocumentoCadastral.objects.get()
+    assert documento.esta_vencido
+    assert documento.dias_desde_emissao == tipo.dias_validade + 28
+    corpo = resposta.content.decode()
+    assert "fora do prazo" in corpo
+    # Continua contando como pendência: vencido não sustenta o dossiê.
+    assert tipo in solicitacao.pendencias_cadastrais()
 
 
 def test_envio_exige_autenticacao(client, solicitacao):
@@ -313,10 +404,14 @@ def test_colega_do_clube_envia_para_perfil_do_time(client, solicitacao):
     colega.groups.add(Group.objects.get(name=Papel.CLUBE))
     client.force_login(colega)
 
-    tipo = solicitacao.pendencias_cadastrais()[0]
+    tipo = _tipo_simples(solicitacao)
     client.post(
         reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
-        {"tipo": tipo.id, "arquivos": [_arquivo("documento.pdf", PDF)]},
+        {
+            "tipo": tipo.id,
+            "arquivos": [_arquivo("documento.pdf", PDF)],
+            "data_emissao": _emissao(),
+        },
     )
 
     assert DocumentoCadastral.objects.filter(enviado_por=colega).exists()

@@ -162,7 +162,7 @@ class VincularDocumentosForm(forms.Form):
                 widget=forms.CheckboxSelectMultiple,
                 initial=[d.id for d in opcoes if d.id in vinculados],
                 help_text=(
-                    "Nenhum documento validado deste tipo — envie um novo abaixo."
+                    "Nenhum documento validado deste tipo; envie um novo abaixo."
                     if not opcoes
                     else "Documentos já validados no perfil."
                 ),

@@ -44,7 +44,7 @@ class TipoDocumento(models.Model):
         "obrigatório no kit",
         default=True,
         help_text="Desmarque para itens condicionais, como a procuração, exigida "
-        "apenas 'quando houver' — não contam como pendência do dossiê.",
+        "apenas 'quando houver'; não contam como pendência do dossiê.",
     )
     dias_validade = models.PositiveIntegerField(
         "validade (dias)",
@@ -58,7 +58,7 @@ class TipoDocumento(models.Model):
     exige_data_emissao = models.BooleanField(
         "exige data de emissão",
         default=True,
-        help_text="Desmarque quando a emissão não define a validade — o RG, por exemplo.",
+        help_text="Desmarque quando a emissão não define a validade, como o RG.",
     )
     aceita_multiplos_arquivos = models.BooleanField(
         "aceita vários arquivos",
@@ -134,7 +134,7 @@ class ExigenciaCadastral(models.Model):
     obrigatorio = models.BooleanField(
         default=True,
         help_text="Desmarque para itens condicionais, como a procuração "
-        "('quando houver') — não contam como pendência.",
+        "('quando houver'); não contam como pendência.",
     )
     grupo_alternativo = models.CharField(
         max_length=50,
@@ -150,7 +150,7 @@ class ExigenciaCadastral(models.Model):
         ordering = ("tipo_pessoa", "valor_minimo", "tipo_documento__nome")
 
     def __str__(self) -> str:
-        return f"{self.get_tipo_pessoa_display()} — {self.tipo_documento}"
+        return f"{self.get_tipo_pessoa_display()}: {self.tipo_documento}"
 
     def clean(self):
         if self.valor_maximo is not None and self.valor_maximo < self.valor_minimo:

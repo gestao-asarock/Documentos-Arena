@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load formatacao %}
 
-{% block titulo %}Conferir {{ documento.rotulo }} — Documentos Arena{% endblock %}
+{% block titulo %}Conferir {{ documento.rotulo }} | Documentos Arena{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
@@ -59,7 +59,7 @@
     <p class="ajuda">
       Perfil
       <a href="{% url 'solicitacoes:detalhe' solicitacao.pk %}">#{{ solicitacao.pk }}</a>
-      — {{ contraparte.get_tipo_pessoa_display }}.
+      ({{ contraparte.get_tipo_pessoa_display }}).
     </p>
   {% endif %}
 </section>
@@ -68,7 +68,7 @@
   <h2>Decisão</h2>
   <p class="ajuda">
     A análise por IA ainda não está ligada: por ora a conferência é visual. Quando entrar,
-    os dados extraídos e as evidências aparecem aqui — a decisão continua sendo sua.
+    os dados extraídos e as evidências aparecem aqui; a decisão continua sendo sua.
   </p>
 
   <form method="post" action="{% url 'analise:decidir' documento.pk %}" class="formulario">

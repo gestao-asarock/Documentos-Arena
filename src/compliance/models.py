@@ -57,7 +57,7 @@ class ParecerCompliance(models.Model):
     )
     processos = models.TextField(
         blank=True,
-        help_text="Cível, criminal, trabalhista, fiscal e execuções — separe por esfera.",
+        help_text="Cível, criminal, trabalhista, fiscal e execuções; separe por esfera.",
     )
     sancoes = models.TextField(
         "sanções e listas restritivas",
@@ -84,7 +84,7 @@ class ParecerCompliance(models.Model):
     termos_pesquisados = models.CharField(
         max_length=255,
         blank=True,
-        help_text="Palavras-chave usadas no webcheck — registre para o parecer ser refazível.",
+        help_text="Palavras-chave usadas no webcheck; registre para o parecer ser refazível.",
     )
     beneficiario_final = models.TextField(
         "beneficiário final e grupo econômico",
@@ -127,7 +127,7 @@ class ParecerCompliance(models.Model):
         ordering = ("-data_criacao",)
 
     def __str__(self) -> str:
-        return f"Parecer — {self.habilitacao.contraparte.nome}"
+        return f"Parecer: {self.habilitacao.contraparte.nome}"
 
     @property
     def esta_concluido(self) -> bool:
@@ -179,4 +179,4 @@ class EvidenciaParecer(models.Model):
         ordering = ("bloco", "data_envio")
 
     def __str__(self) -> str:
-        return f"{self.get_bloco_display()} — {self.nome_original or self.arquivo.name}"
+        return f"{self.get_bloco_display()}: {self.nome_original or self.arquivo.name}"
