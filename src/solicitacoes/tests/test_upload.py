@@ -306,10 +306,25 @@ def test_envio_exige_autenticacao(client, solicitacao):
     assert reverse("login") in resposta.url
 
 
-def test_clube_nao_envia_para_solicitacao_de_outro(client, solicitacao):
-    outro = Usuario.objects.create_user(username="clube.outro", password="senha-de-teste")
-    outro.groups.add(Group.objects.get(name=Papel.CLUBE))
-    client.force_login(outro)
+def test_colega_do_clube_envia_para_perfil_do_time(client, solicitacao):
+    """Enviar é a função do Clube, e o perfil é do time — inclusive o que a
+    ASAROCK cadastrou em nome dele (AGENTS.md D35)."""
+    colega = Usuario.objects.create_user(username="clube.outro", password="senha-de-teste")
+    colega.groups.add(Group.objects.get(name=Papel.CLUBE))
+    client.force_login(colega)
+
+    tipo = solicitacao.pendencias_cadastrais()[0]
+    client.post(
+        reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),
+        {"tipo": tipo.id, "arquivos": [_arquivo("documento.pdf", PDF)]},
+    )
+
+    assert DocumentoCadastral.objects.filter(enviado_por=colega).exists()
+
+
+def test_usuario_sem_papel_nao_envia(client, solicitacao):
+    estranho = Usuario.objects.create_user(username="sem.papel.upload", password="senha-de-teste")
+    client.force_login(estranho)
 
     resposta = client.post(
         reverse("solicitacoes:enviar_documento", args=[solicitacao.pk]),

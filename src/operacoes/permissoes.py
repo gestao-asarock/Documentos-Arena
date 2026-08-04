@@ -45,10 +45,12 @@ def pode_decidir(usuario, etapa: EtapaAprovacao) -> bool:
     return usuario.groups.filter(name__in=permitidos).exists()
 
 
-def pode_cancelar(usuario, registro) -> bool:
-    """Cancela quem criou, ou qualquer pessoa interna da ASAROCK.
+def eh_dono_ou_interno(usuario, registro) -> bool:
+    """Quem abriu o registro, ou qualquer pessoa interna da ASAROCK.
 
-    O usuário do Clube só mexe no que é dele; a ASAROCK precisa poder encerrar
+    É a régua das ações que **desfazem** coisa: cancelar, excluir. O Clube
+    enxerga a esteira inteira do time (D35), mas desfazer o que outra pessoa fez
+    continua sendo de quem fez — ou da ASAROCK, que precisa poder encerrar
     pedido abandonado (AGENTS.md §4.2).
     """
     if not usuario.is_authenticated:
@@ -56,6 +58,10 @@ def pode_cancelar(usuario, registro) -> bool:
     if usuario.is_superuser or usuario.eh_interno:
         return True
     return registro.criada_por_id == usuario.id
+
+
+def pode_cancelar(usuario, registro) -> bool:
+    return eh_dono_ou_interno(usuario, registro)
 
 
 def pode_criar_operacao(usuario) -> bool:

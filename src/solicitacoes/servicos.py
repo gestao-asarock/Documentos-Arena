@@ -3,6 +3,7 @@
 from django.db import transaction
 
 from auditoria.servicos import Acao, registrar
+from contas.consultas import criado_dentro_da_casa
 from contrapartes.models import (
     Contraparte,
     Habilitacao,
@@ -10,6 +11,7 @@ from contrapartes.models import (
     apenas_digitos,
     deduzir_tipo_pessoa,
 )
+from contrapartes.servicos import avancar_habilitacao
 
 from .models import Solicitacao, StatusSolicitacao
 
@@ -72,14 +74,19 @@ def abrir_habilitacao(solicitacao: Solicitacao, *, usuario=None) -> Habilitacao:
         objeto=habilitacao,
         usuario=usuario,
     )
-    return habilitacao
+
+    # O kit é da contraparte: um perfil novo pode já nascer com ele completo e
+    # aprovado. Sem derivar o estado aqui, a habilitação ficava presa em
+    # "aguardando documentos" esperando uma aprovação que não tinha o que
+    # aprovar — nada para o Clube enviar, nada na triagem, fluxo parado.
+    return avancar_habilitacao(habilitacao, usuario=usuario)
 
 
 def solicitacoes_visiveis_para(usuario):
-    """Mesma regra das operações: o Clube vê apenas o que criou (AGENTS.md §4.2)."""
+    """Mesma regra das operações: o Clube vê a esteira do time (AGENTS.md §4.2, D35)."""
     base = Solicitacao.objects.select_related("contraparte", "habilitacao")
     if usuario.is_superuser or usuario.eh_interno:
         return base
     if usuario.eh_do_clube:
-        return base.filter(criada_por=usuario)
+        return base.filter(criado_dentro_da_casa()).distinct()
     return base.none()

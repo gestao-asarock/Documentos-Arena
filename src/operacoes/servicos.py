@@ -10,6 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from auditoria.servicos import Acao, registrar
+from contas.consultas import criado_dentro_da_casa
 
 from .estados import (
     ETAPAS_DA_HABILITACAO,
@@ -339,14 +340,16 @@ def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Opera
 def operacoes_visiveis_para(usuario):
     """Queryset filtrado por papel.
 
-    O usuário do Clube é externo: enxerga apenas o que seu time criou, sem
-    pareceres internos (AGENTS.md §4.2).
+    O Clube enxerga a esteira do **time**, incluindo o contrato que a ASAROCK
+    abriu em nome dele — antes só via o que ele mesmo criara, e um contrato
+    cadastrado pelo administrador simplesmente não existia na tela dele
+    (AGENTS.md §4.2, D35). Pareceres internos continuam barrados por papel.
     """
     base = Operacao.objects.select_related("contraparte", "tipo_operacao", "regra")
     if usuario.is_superuser or usuario.eh_interno:
         return base
     if usuario.eh_do_clube:
-        return base.filter(criada_por=usuario)
+        return base.filter(criado_dentro_da_casa()).distinct()
     return base.none()
 
 

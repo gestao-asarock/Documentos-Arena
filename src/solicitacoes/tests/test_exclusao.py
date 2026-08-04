@@ -103,14 +103,17 @@ def test_documento_volta_a_ser_pendencia_apos_exclusao(
     assert tipo in kit["faltando"]
 
 
-def test_outro_usuario_do_clube_nao_exclui(client, solicitacao, documento):
-    outro = Usuario.objects.create_user(username="clube.terceiro", password="senha-de-teste")
-    outro.groups.add(Group.objects.get(name=Papel.CLUBE))
-    client.force_login(outro)
+def test_colega_do_clube_ve_mas_nao_exclui(client, solicitacao, documento):
+    """Ver é do time; apagar continua sendo de quem enviou (AGENTS.md D35)."""
+    colega = Usuario.objects.create_user(username="clube.terceiro", password="senha-de-teste")
+    colega.groups.add(Group.objects.get(name=Papel.CLUBE))
+    client.force_login(colega)
+
+    assert client.get(reverse("solicitacoes:detalhe", args=[solicitacao.pk])).status_code == 200
 
     resposta = _excluir(client, solicitacao, documento)
 
-    assert resposta.status_code == 404
+    assert resposta.status_code == 403
     assert DocumentoCadastral.objects.filter(pk=documento.pk).exists()
 
 

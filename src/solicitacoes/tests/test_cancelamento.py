@@ -86,6 +86,27 @@ def test_cancelamento_exige_motivo(solicitacao, clube):
         solicitacao.cancelar("   ", usuario=clube)
 
 
+def test_erro_de_preenchimento_aparece_como_alerta(client, clube, solicitacao):
+    """A recusa por campo vazio precisa chegar em vermelho, não em cinza.
+
+    O Django nomeia a mensagem `error`; o CSS fala `erro`. Sem o MESSAGE_TAGS
+    ligando os dois, o aviso saía sem cor e parecia defeito do sistema.
+    """
+    client.force_login(clube)
+
+    resposta = client.post(
+        reverse("solicitacoes:cancelar", args=[solicitacao.pk]), {"motivo": "   "}, follow=True
+    )
+    corpo = resposta.content.decode()
+
+    assert "aviso--erro" in corpo
+    assert "aviso--forte" in corpo
+    assert 'role="alert"' in corpo
+    assert "Informe o motivo do cancelamento." in corpo
+    solicitacao.refresh_from_db()
+    assert not solicitacao.esta_cancelada
+
+
 def test_nao_cancela_duas_vezes(solicitacao, clube):
     solicitacao.cancelar("Desistência.", usuario=clube)
     solicitacao.save()
@@ -111,15 +132,18 @@ def test_cancelar_o_contrato_libera_o_perfil(solicitacao, operacao, crm):
 
 
 def test_outro_usuario_do_clube_nao_cancela(client, solicitacao):
-    intruso = _usuario("clube.intruso.cancel", Papel.CLUBE)
-    client.force_login(intruso)
+    """Ele enxerga o perfil do time (D35), mas cancelar é de quem abriu."""
+    colega = _usuario("clube.intruso.cancel", Papel.CLUBE)
+    client.force_login(colega)
+
+    assert client.get(reverse("solicitacoes:detalhe", args=[solicitacao.pk])).status_code == 200
 
     resposta = client.post(
         reverse("solicitacoes:cancelar", args=[solicitacao.pk]), {"motivo": "Qualquer."}
     )
     solicitacao.refresh_from_db()
 
-    assert resposta.status_code == 404
+    assert resposta.status_code == 403
     assert not solicitacao.esta_cancelada
 
 

@@ -12,9 +12,14 @@ Cancelar não apaga: o registro fica, com motivo e autor (AGENTS.md §6).
         data-confirmar="Cancelar {{ rotulo }}? O fluxo será encerrado.">
     {% csrf_token %}
     <div class="campo">
-      <label for="motivo-cancelamento">Motivo do cancelamento</label>
-      <textarea id="motivo-cancelamento" name="motivo" rows="2"
+      {# `required` evita a ida ao servidor só para voltar com erro; a view
+         continua validando, porque o navegador não é fonte de verdade. #}
+      <label for="motivo-cancelamento">
+        Motivo do cancelamento <span class="obrigatorio" aria-hidden="true">*</span>
+      </label>
+      <textarea id="motivo-cancelamento" name="motivo" rows="2" required
                 placeholder="Ex.: evento desmarcado pelo contratante."></textarea>
+      <small class="ajuda">Obrigatório — fica registrado na auditoria com o seu nome.</small>
     </div>
     <div class="acoes">
       <button type="submit" class="botao botao--perigo">Cancelar {{ rotulo }}</button>

@@ -12,7 +12,9 @@ from django.db.models import Q
 from auditoria.servicos import Acao, registrar
 from contas.models import Papel
 from contrapartes.models import DocumentoCadastral, StatusHabilitacao
+from contrapartes.servicos import avancar_habilitacao
 from documentos.models import StatusDocumento
+from solicitacoes.models import StatusSolicitacao
 
 #: A triagem é do CRM, conforme o guia. O Compliance pode conferir também — é
 #: quem sofre a consequência de documento mal triado (AGENTS.md D34).
@@ -45,8 +47,17 @@ def fila_de_conferencia():
 
 
 def _perfil_de(documento: DocumentoCadastral):
-    """O cadastro de perfil mais recente da contraparte."""
-    return documento.contraparte.solicitacoes.order_by("-data_criacao").first()
+    """O cadastro de perfil ativo mais recente da contraparte.
+
+    Perfil cancelado não recebe a decisão: quando o Clube refaz o cadastro da
+    mesma pessoa, o mais recente pode ser o antigo, e a aprovação ia mexer no
+    registro errado — deixando o perfil em uso parado.
+    """
+    return (
+        documento.contraparte.solicitacoes.exclude(status=StatusSolicitacao.CANCELADA)
+        .order_by("-data_criacao")
+        .first()
+    )
 
 
 @transaction.atomic
@@ -108,47 +119,12 @@ def rejeitar_documento(documento: DocumentoCadastral, *, usuario, motivo: str):
 
 
 def _reavaliar_habilitacao(documento: DocumentoCadastral, *, usuario=None):
-    """Move a habilitação conforme o estado real do dossiê.
+    """Move a habilitação do perfil conforme o estado real do dossiê.
 
-    Kit completo e sem rejeição pendente → segue para compliance. Enquanto faltar
-    documento, volta a aguardar envio: o estado é derivado, nunca assumido.
+    A regra em si mora em `contrapartes.servicos`: ela também vale na abertura do
+    perfil, quando não houve aprovação nenhuma para disparar este caminho.
     """
     perfil = _perfil_de(documento)
-    if perfil is None or perfil.habilitacao is None:
+    if perfil is None:
         return None
-
-    habilitacao = perfil.habilitacao
-    if habilitacao.status in {StatusHabilitacao.HABILITADA, StatusHabilitacao.RECUSADA}:
-        return habilitacao
-
-    contraparte = documento.contraparte
-    tem_rejeitado = contraparte.documentos_cadastrais.filter(
-        status=StatusDocumento.REJEITADO
-    ).exists()
-
-    if tem_rejeitado:
-        novo = StatusHabilitacao.COM_PENDENCIA
-    elif perfil.kit_completo:
-        novo = StatusHabilitacao.EM_COMPLIANCE
-    elif contraparte.documentos_cadastrais.filter(
-        status__in=[StatusDocumento.ENVIADO, StatusDocumento.PROCESSANDO]
-    ).exists():
-        novo = StatusHabilitacao.EM_ANALISE_DOCUMENTAL
-    else:
-        novo = StatusHabilitacao.AGUARDANDO_DOCUMENTOS
-
-    if habilitacao.status != novo:
-        anterior = habilitacao.get_status_display()
-        habilitacao.status = novo
-        habilitacao.save()
-        registrar(
-            acao=Acao.TRANSICAO_ESTADO,
-            descricao=(
-                f"Habilitação da contraparte #{contraparte.pk}: "
-                f"{anterior} → {habilitacao.get_status_display()}"
-            ),
-            objeto=habilitacao,
-            usuario=usuario,
-        )
-
-    return habilitacao
+    return avancar_habilitacao(perfil.habilitacao, usuario=usuario)

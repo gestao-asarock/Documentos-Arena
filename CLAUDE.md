@@ -183,6 +183,18 @@ acontece **uma vez, na esteira do perfil**; o contrato não a refaz (AGENTS.md D
 contraparte habilitada, e as etapas 1 a 3 chegam como `CUMPRIDA_NA_HABILITACAO`, trazendo
 o veredito dos pareceres. O contrato começa direto na revisão jurídica.
 
+**Estado do perfil é derivado do dossiê**, não do evento de aprovação
+(`contrapartes/servicos.avancar_habilitacao`). É o que resolve o recadastro da mesma
+pessoa: o kit é da contraparte, então um perfil novo pode nascer com ele já aprovado, e
+antes ficava preso em "aguardando documentos" esperando uma aprovação que não tinha o que
+aprovar. A regra roda ao abrir o perfil e ao abrir a tela — registro travado se conserta
+sozinho. **Perfil em crédito ou adiante não regride:** dali em diante quem manda é o
+parecer, não o dossiê.
+
+**Visibilidade do Clube é do time, não do usuário** (AGENTS.md D35): filtro em
+`contas/consultas.criado_dentro_da_casa`. Ver é do time; cancelar e excluir continuam
+com quem abriu o registro (`operacoes.permissoes.eh_dono_ou_interno`).
+
 **Ainda sem IA:** a conferência é visual. A task Celery, a extração e a evidência visual
 entram no próximo incremento — e é lá que o `htmx.min.js` passa a ser necessário.
 
@@ -205,7 +217,7 @@ Ao ser respondida, a pergunta sai daqui e vira decisão no AGENTS.md §7.
 |---|---|---|
 | P1 | A contraparte terá marcação de **parte relacionada** (só alerta em tela, sem alçada especial)? | Um booleano agora evita migration depois. |
 | P2 | Quais **operações reais passadas** servirão de molde para a massa de teste, e quem prepara os arquivos com conteúdo fictício? | Bloqueia a validação com os times (AGENTS.md §7, D15). |
-| P4 | Quem no Clube são os usuários do papel `clube`, e eles enxergam todas as operações do Clube ou só as que criaram? | Define a regra de filtragem de queryset. |
+| P10 | **Cancelar o perfil deveria invalidar a habilitação da contraparte?** Hoje não invalida: a validação é da pessoa e sobrevive ao cadastro (D19, D29), então cancelar um perfil validado e recriá-lo devolve um perfil já pronto, sem refazer compliance. Se a intenção ao cancelar for "refazer do zero", o comportamento esperado é outro. | Define se cancelar é só arquivar o cadastro ou também derrubar a validação — e se existe um jeito de forçar nova due diligence. |
 | P9 | A ASAROCK tem dever de comunicar operação suspeita ao **COAF/UIF**, e quer registrar essa comunicação aqui? | O campo existe no modelo mas saiu da tela: não altera o fluxo e confundia quem preenche. |
 | P5 | **Prazo de validade da habilitação** da contraparte (praxe: 12 meses). | O campo existe; sem o número, não há revalidação automática (AGENTS.md D19). |
 | P6 | Risco **alto** no parecer de compliance bloqueia a contratação ou escala para alguém liberar? Quem pode liberar? | Governança: define se existe estado de exceção aprovada (AGENTS.md §4.7). |

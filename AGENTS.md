@@ -217,8 +217,13 @@ no pipeline documental, um parecer automático pode ser acrescentado depois sem 
 modelagem. Não antecipe isso.
 
 O papel `clube` é externo à ASA. Toda tela e toda queryset precisa considerar que esse
-usuário **não pode** ver operações que seu time não criou, pareceres internos, comentários
-internos, nem o resultado bruto da consulta de compliance.
+usuário **não pode** ver pareceres internos, comentários internos, fila de trabalho de
+outra área, nem o resultado bruto da consulta de compliance.
+
+**O que ele vê é a esteira do time, não a própria caixa de entrada** (D35): perfil e
+contrato abertos por qualquer pessoa da casa — inclusive pela ASAROCK, em nome dele —
+aparecem para ele. Registro de alguém fora da casa, não. **Ver não é agir**: cancelar e
+excluir seguem restritos a quem abriu o registro ou a alguém interno.
 
 ### 4.3 Fluxo piloto do MVP
 
@@ -712,6 +717,19 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   identificáveis são substituídos. **Nenhum documento real é enviado ao Gemini enquanto
   estivermos no free tier** (§5.1). Quem prepara e fornece essa massa é o responsável
   pelo projeto — não invente operações do nada nem presuma quais existem.
+- **D35 — O Clube enxerga a esteira do time, não a própria caixa de entrada.**
+  Resposta à antiga pergunta P4. A queryset do papel `clube` inclui tudo que foi aberto
+  por alguém **da casa** — ASAROCK ou Clube —, e não apenas o que o usuário logado criou.
+  Motivo concreto: perfil ou contrato cadastrado pela ASAROCK (inclusive pelo
+  administrador, para corrigir algo à mão) sumia da tela do Clube, que não tinha como
+  saber que existia nem como operá-lo. O filtro está em `contas/consultas.py` e cobre
+  explicitamente o superusuário, que costuma não ter grupo nenhum.
+  **Ver não é agir:** cancelar e excluir continuam restritos a quem abriu o registro, ou
+  a alguém interno (`permissoes.eh_dono_ou_interno`). Enviar documento é liberado ao
+  time, porque enviar é a função do Clube e o perfil é do time.
+  O filtro **falha fechado**: papel externo futuro que não esteja em `PAPEIS_DA_CASA`
+  não passa a ver nada por descuido. Segue valendo que o Clube não vê parecer interno,
+  fila de trabalho nem resultado bruto de compliance — isso é barrado por papel na view.
 - **D34 — Uma área, uma função, uma tela.** CRM: triagem + crédito, em filas separadas.
   Compliance: due diligence (e triagem, se quiser ajudar) — **não faz crédito**, porque
   são análises distintas. Jurídico: só revisão de contratos, com fila própria. Clube:

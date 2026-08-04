@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Documentos Arena{% endblock %}</title>
   {# Incremente o ?v= ao editar CSS ou JS: sem isso o navegador serve a versão antiga. #}
-  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=6">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=8">
   {# HTMX entra quando a primeira tela precisar (upload, polling de análise). #}
   {# Baixe htmx.min.js para src/static/js/ — nada de CDN, o servidor é privado. #}
   <script src="{% static 'js/formulario.js' %}?v=5" defer></script>
@@ -15,15 +15,18 @@
   {% if user.is_authenticated %}
     <header class="cabecalho">
       <a class="cabecalho__marca" href="{% url 'operacoes:lista' %}">Documentos Arena</a>
+      {# A aba atual sai do app da URL resolvida: nenhuma view precisa informá-la. #}
+      {% with secao=request.resolver_match.app_name %}
       <nav class="cabecalho__nav">
-        <a href="{% url 'solicitacoes:lista' %}">Perfis</a>
-        <a href="{% url 'operacoes:lista' %}">Contratos</a>
-        {% if pode_conferir %}<a href="{% url 'analise:fila' %}">Triagem</a>{% endif %}
-        {% if pode_analisar_credito %}<a href="{% url 'credito:fila' %}">Crédito</a>{% endif %}
-        {% if pode_analisar_compliance %}<a href="{% url 'compliance:fila' %}">Due diligence</a>{% endif %}
-        {% if pode_revisar_juridico %}<a href="{% url 'juridico:fila' %}">Jurídico</a>{% endif %}
-        {% if user.is_staff %}<a href="{% url 'admin:index' %}">Administração</a>{% endif %}
+        <a href="{% url 'solicitacoes:lista' %}"{% if secao == 'solicitacoes' %} aria-current="page"{% endif %}>Perfis</a>
+        <a href="{% url 'operacoes:lista' %}"{% if secao == 'operacoes' %} aria-current="page"{% endif %}>Contratos</a>
+        {% if pode_conferir %}<a href="{% url 'analise:fila' %}"{% if secao == 'analise' %} aria-current="page"{% endif %}>Triagem</a>{% endif %}
+        {% if pode_analisar_credito %}<a href="{% url 'credito:fila' %}"{% if secao == 'credito' %} aria-current="page"{% endif %}>Crédito</a>{% endif %}
+        {% if pode_analisar_compliance %}<a href="{% url 'compliance:fila' %}"{% if secao == 'compliance' %} aria-current="page"{% endif %}>Due diligence</a>{% endif %}
+        {% if pode_revisar_juridico %}<a href="{% url 'juridico:fila' %}"{% if secao == 'juridico' %} aria-current="page"{% endif %}>Jurídico</a>{% endif %}
+        {% if user.is_staff %}<a href="{% url 'admin:index' %}"{% if secao == 'admin' %} aria-current="page"{% endif %}>Administração</a>{% endif %}
       </nav>
+      {% endwith %}
       <div class="cabecalho__usuario">
         <span>{{ user }}</span>
         <form method="post" action="{% url 'logout' %}">
@@ -35,11 +38,7 @@
   {% endif %}
 
   <main class="conteudo">
-    {% if messages %}
-      {% for mensagem in messages %}
-        <p class="aviso aviso--{{ mensagem.tags }}">{{ mensagem }}</p>
-      {% endfor %}
-    {% endif %}
+    {% include "_mensagens.html" %}
     {% block conteudo %}{% endblock %}
   </main>
 </body>

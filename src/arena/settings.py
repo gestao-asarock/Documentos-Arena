@@ -8,6 +8,7 @@ Nunca escreva credencial neste arquivo — AGENTS.md §6.
 from pathlib import Path
 
 import environ
+from django.contrib.messages import constants as message_constants
 
 # src/arena/settings.py → SRC_DIR = src/ ; BASE_DIR = raiz do repositório.
 SRC_DIR = Path(__file__).resolve().parent.parent
@@ -93,6 +94,18 @@ TEMPLATES = [
         },
     },
 ]
+
+# O Django nomeia as mensagens em inglês (error, warning, success). O CSS fala
+# as cinco famílias de operacoes/templatetags/situacao.py, em português — e a
+# classe `aviso--error`, que não existia, saía sem cor nenhuma: o erro que
+# barrava a ação parecia um rodapé cinza. Aqui os dois vocabulários se juntam.
+MESSAGE_TAGS = {
+    message_constants.DEBUG: "neutro",
+    message_constants.INFO: "andamento",
+    message_constants.SUCCESS: "sucesso",
+    message_constants.WARNING: "atencao",
+    message_constants.ERROR: "erro",
+}
 
 WSGI_APPLICATION = "arena.wsgi.application"
 ASGI_APPLICATION = "arena.asgi.application"

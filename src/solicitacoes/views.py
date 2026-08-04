@@ -11,9 +11,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
+from contrapartes.servicos import avancar_habilitacao
 from documentos.models import StatusDocumento
 from integracoes.enderecos import buscar_por_cep
-from operacoes.permissoes import pode_cancelar, pode_criar_operacao
+from operacoes.permissoes import eh_dono_ou_interno, pode_cancelar, pode_criar_operacao
 
 from . import fluxo as fluxo_do_processo
 from .forms import EnvioDocumentoForm, SolicitacaoForm
@@ -60,6 +61,13 @@ def nova(request):
 @login_required
 def detalhe(request, pk: int):
     solicitacao = get_object_or_404(solicitacoes_visiveis_para(request.user), pk=pk)
+
+    # Reaplica a regra antes de mostrar, como o contrato já faz: perfil parado
+    # numa etapa que o dossiê não sustenta mais se corrige ao ser aberto, em vez
+    # de exigir intervenção no banco.
+    if not solicitacao.esta_cancelada:
+        avancar_habilitacao(solicitacao.habilitacao, usuario=request.user)
+
     pendencias = solicitacao.pendencias_cadastrais()
     form_envio = EnvioDocumentoForm(tipos_pendentes=pendencias)
 
@@ -180,6 +188,10 @@ def excluir_documento(request, pk: int, documento_id: int):
         return redirect("solicitacoes:detalhe", pk=pk)
 
     solicitacao = get_object_or_404(solicitacoes_visiveis_para(request.user), pk=pk)
+    # Ver é do time; apagar é de quem enviou (ou da ASAROCK) — D35.
+    if not eh_dono_ou_interno(request.user, solicitacao):
+        raise PermissionDenied
+
     documento = get_object_or_404(
         DocumentoCadastral, pk=documento_id, contraparte=solicitacao.contraparte
     )

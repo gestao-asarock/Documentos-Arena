@@ -151,8 +151,11 @@
           data-confirmar="Recusar esta contraparte? O fluxo será encerrado.">
       {% csrf_token %}
       <div class="campo">
-        <label for="motivo">Motivo da recusa</label>
-        <textarea id="motivo" name="motivo" rows="2"></textarea>
+        <label for="motivo">
+          Motivo da recusa <span class="obrigatorio" aria-hidden="true">*</span>
+        </label>
+        <textarea id="motivo" name="motivo" rows="2" required></textarea>
+        <small class="ajuda">Obrigatório — o Clube vê este texto.</small>
       </div>
       <div class="acoes">
         <button type="submit" class="botao botao--perigo">Recusar contraparte</button>

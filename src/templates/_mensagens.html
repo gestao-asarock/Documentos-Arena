@@ -1,0 +1,44 @@
+{% comment %}
+Mensagens de uma ação (Django messages), nas cinco famílias de
+operacoes/templatetags/situacao.py.
+
+Erro e atenção ganham tratamento forte: eles significam que **a ação não
+aconteceu**, e o usuário precisa saber disso antes de sair da tela. Sem título e
+sem símbolo, "Informe o motivo do cancelamento" parecia defeito do sistema em
+vez de um campo faltando.
+
+`role="alert"` faz o leitor de tela anunciar na hora — pelo mesmo motivo.
+{% endcomment %}
+{% if messages %}
+  <div class="avisos">
+    {% for mensagem in messages %}
+      {% if "erro" in mensagem.tags %}
+        <div class="aviso aviso--erro aviso--forte" role="alert">
+          <span class="aviso__marca" aria-hidden="true">&#10007;</span>
+          <p class="aviso__corpo">
+            <strong class="aviso__titulo">Não foi possível concluir</strong>
+            {{ mensagem }}
+          </p>
+        </div>
+      {% elif "atencao" in mensagem.tags %}
+        <div class="aviso aviso--atencao aviso--forte" role="alert">
+          <span class="aviso__marca" aria-hidden="true">&#9888;</span>
+          <p class="aviso__corpo">
+            <strong class="aviso__titulo">Atenção</strong>
+            {{ mensagem }}
+          </p>
+        </div>
+      {% elif "sucesso" in mensagem.tags %}
+        <div class="aviso aviso--sucesso">
+          <span class="aviso__marca" aria-hidden="true">&#10003;</span>
+          <p class="aviso__corpo">{{ mensagem }}</p>
+        </div>
+      {% else %}
+        <div class="aviso aviso--andamento">
+          <span class="aviso__marca" aria-hidden="true">&#9679;</span>
+          <p class="aviso__corpo">{{ mensagem }}</p>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}

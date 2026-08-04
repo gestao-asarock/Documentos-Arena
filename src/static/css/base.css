@@ -52,11 +52,17 @@
   --esp-5: 24px;
   --esp-6: 32px;
 
-  /* Tipografia — densidade alta, usuário passa o dia na ferramenta */
+  /*
+   * Tipografia — o usuário passa o dia na ferramenta, mas densidade não pode
+   * custar legibilidade: 12px em tela de sala de reunião não se lê. A escala
+   * subiu um degrau inteiro; o corpo é o mínimo confortável para leitura
+   * prolongada, e o "pequeno" continua sendo apoio, nunca informação única.
+   */
   --fonte: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --texto-p: 14px;
-  --texto-pequeno: 12px;
-  --texto-titulo: 20px;
+  --texto-p: 15px;
+  --texto-pequeno: 13px;
+  --texto-titulo: 24px;
+  --texto-secao: 18px;
 
   --raio: 6px;
 }
@@ -77,29 +83,77 @@ body {
   margin: 0;
   font-family: var(--fonte);
   font-size: var(--texto-p);
+  line-height: 1.5;
   color: var(--cor-texto);
   background: var(--cor-fundo);
 }
 
-h1 { font-size: var(--texto-titulo); margin: 0; }
-h2 { font-size: 16px; margin: 0 0 var(--esp-3); }
+h1 { font-size: var(--texto-titulo); margin: 0; line-height: 1.25; }
+h2 { font-size: var(--texto-secao); margin: 0 0 var(--esp-3); }
 a { color: var(--cor-primaria); }
 
 /* Cabeçalho ------------------------------------------------------------- */
 
 .cabecalho {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--esp-5);
-  padding: var(--esp-3) var(--esp-5);
+  padding: 0 var(--esp-5);
   background: var(--cor-primaria);
   color: #fff;
+  font-size: 16px;
 }
-.cabecalho__marca { font-weight: 600; color: #fff; text-decoration: none; }
-.cabecalho__nav { display: flex; gap: var(--esp-4); flex: 1; }
-.cabecalho__nav a { color: #fff; text-decoration: none; opacity: 0.85; }
-.cabecalho__nav a:hover { opacity: 1; }
+.cabecalho__marca {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 17px;
+  color: #fff;
+  text-decoration: none;
+}
+.cabecalho__nav { display: flex; gap: var(--esp-2); flex: 1; }
+
+/*
+ * A aba atual precisa ser óbvia sem depender só de cor: fundo destacado
+ * **e** sublinhado grosso, com o texto em peso maior.
+ */
+.cabecalho__nav a {
+  display: flex;
+  align-items: center;
+  padding: var(--esp-4) var(--esp-3);
+  color: #fff;
+  text-decoration: none;
+  opacity: 0.78;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+.cabecalho__nav a:hover { opacity: 1; background: rgba(255, 255, 255, 0.1); }
+.cabecalho__nav a:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+.cabecalho__nav a[aria-current="page"] {
+  opacity: 1;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.14);
+  border-bottom-color: #fff;
+}
+
 .cabecalho__usuario { display: flex; align-items: center; gap: var(--esp-3); }
+
+/*
+ * O botão discreto é escuro sobre claro no corpo da página; no cabeçalho, que
+ * é azul-escuro, essa mesma regra deixava "Sair" preto sobre azul, ilegível.
+ */
+.cabecalho .botao--discreto {
+  min-height: 34px;
+  padding-inline: var(--esp-4);
+  color: #fff;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.cabecalho .botao--discreto:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #fff;
+}
+.cabecalho .botao--discreto:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 .conteudo { padding: var(--esp-5); max-width: 1200px; margin: 0 auto; }
 
@@ -153,10 +207,23 @@ a { color: var(--cor-primaria); }
 .linha-clicavel:hover a { color: var(--cor-primaria); }
 .linha-clicavel:focus-within { background: var(--cor-selecao); }
 .tabela__numero { text-align: right; font-variant-numeric: tabular-nums; }
+
+/*
+ * Numa lista de etapas, o olho procura uma coisa só: qual é a da vez. Ela
+ * recebe faixa e fundo; o que já passou fica sóbrio, e o que ainda não chegou
+ * fica apagado, para não competir.
+ */
+.tabela tr.linha--atual > td {
+  background: var(--cor-andamento-fundo);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--cor-andamento);
+}
+.tabela tr.linha--futura > td { color: var(--cor-texto-suave); }
 /* Conferência: o valor registrado precisa saltar aos olhos para comparar. */
 .tabela--conferencia { margin-bottom: var(--esp-4); }
 .tabela--conferencia td strong { font-size: 15px; }
-.tabela--conferencia input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+/* Aqui a caixa é o gesto principal da tela: um pouco maior que o padrão. */
+.tabela--conferencia input[type="checkbox"] { width: 20px; height: 20px; }
 
 .dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--esp-3); margin: 0; }
 .dados dt { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
@@ -185,6 +252,9 @@ a { color: var(--cor-primaria); }
 
 /* Mesmas cinco famílias dos selos, para a mensagem combinar com o estado. */
 .aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--esp-3);
   padding: var(--esp-3);
   border-radius: var(--raio);
   border-left: 3px solid var(--cor-neutro);
@@ -194,7 +264,44 @@ a { color: var(--cor-primaria); }
 .aviso--atencao { border-color: var(--cor-atencao); background: var(--cor-atencao-fundo); }
 .aviso--sucesso,
 .aviso--success { border-color: var(--cor-sucesso); background: var(--cor-sucesso-fundo); }
+/* `info` é o nome do Django; `andamento` é o nome da família aqui. */
+.aviso--andamento,
 .aviso--info { border-color: var(--cor-andamento); background: var(--cor-andamento-fundo); }
+
+.aviso__corpo { margin: 0; }
+.aviso__marca { font-size: 16px; line-height: 1.5; }
+.aviso__titulo { display: block; font-size: 16px; }
+
+/* Região de mensagens da ação: fica acima do conteúdo, com folga para separar. */
+.avisos { display: flex; flex-direction: column; gap: var(--esp-2); margin-bottom: var(--esp-5); }
+
+/*
+ * Aviso forte: a ação **não aconteceu**. Isso não pode parecer nota de rodapé —
+ * o usuário lê, corrige e tenta de novo, ou vai embora achando que o sistema
+ * quebrou. Daí a borda inteira, o realce e a entrada animada.
+ */
+.aviso--forte {
+  padding: var(--esp-4);
+  border: 1px solid currentColor;
+  border-left-width: 6px;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(28, 33, 38, 0.12);
+  animation: aviso-entra 0.22s ease-out;
+}
+.aviso--forte.aviso--erro { color: var(--cor-erro); }
+.aviso--forte.aviso--atencao { color: var(--cor-atencao); }
+/* Só o título herda a cor da família; o texto continua no cinza de leitura. */
+.aviso--forte .aviso__corpo { color: var(--cor-texto); }
+.aviso--forte .aviso__marca { font-size: 20px; line-height: 1.2; }
+
+@keyframes aviso-entra {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+/* Movimento é reforço, nunca requisito: quem pede menos animação não perde nada. */
+@media (prefers-reduced-motion: reduce) {
+  .aviso--forte { animation: none; }
+}
 
 /* Botões e formulários --------------------------------------------------- */
 
@@ -250,6 +357,54 @@ a { color: var(--cor-primaria); }
   border-color: var(--cor-primaria);
 }
 .formulario input[type="file"] { padding: var(--esp-2); }
+
+/*
+ * Caixa de marcação não é campo de texto. A regra acima dava a ela 42px de
+ * altura, padding e borda de input — o que a esticava, empurrava o rótulo para
+ * a linha de baixo e desalinhava tudo. Aqui ela volta a ser uma caixa.
+ */
+.formulario input[type="checkbox"],
+.formulario input[type="radio"],
+input[type="checkbox"],
+input[type="radio"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  accent-color: var(--cor-primaria);
+  cursor: pointer;
+}
+
+/*
+ * CheckboxSelectMultiple/RadioSelect: o Django entrega <ul><li><label>. Sem
+ * estilo a lista herda marcador e recuo, e o rótulo fica solto do quadradinho.
+ */
+.campo ul,
+.formulario ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+}
+.campo li label,
+.formulario li label,
+.rotulo-marcacao {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  font-weight: 400;
+  cursor: pointer;
+  /* Alvo de clique confortável sem esticar a caixa. */
+  min-height: 24px;
+}
+/* Rótulo de duas linhas: a caixa alinha com a primeira, não com o meio. */
+.rotulo-marcacao--alto { align-items: flex-start; }
+.rotulo-marcacao--alto input { margin-top: 3px; }
 .campo--erro input, .campo--erro select { border-color: var(--cor-reprovado); }
 .campo--carregando { background-image: linear-gradient(90deg, transparent, var(--cor-fundo)); }
 .formulario textarea, .formulario select {
@@ -264,7 +419,44 @@ a { color: var(--cor-primaria); }
 .acoes { display: flex; gap: var(--esp-2); margin-top: var(--esp-3); }
 .acoes .botao { margin-top: 0; }
 .cartao--estreito { max-width: 560px; }
-.decisao { border-top: 1px solid var(--cor-borda); margin-top: var(--esp-4); padding-top: var(--esp-3); }
+
+/*
+ * Foco do momento (AGENTS.md §8) -----------------------------------------
+ *
+ * A tela mostra o histórico inteiro, mas quem abre precisa saber, em um olhar,
+ * **onde agir agora**. Um único bloco por página recebe este tratamento: fundo
+ * da família "em andamento", faixa lateral e título com marcador. Se dois
+ * blocos disputarem o destaque, o destaque deixa de existir.
+ */
+.decisao {
+  margin-top: var(--esp-5);
+  padding: var(--esp-4);
+  border: 1px solid var(--cor-andamento);
+  border-left: 4px solid var(--cor-andamento);
+  border-radius: var(--raio);
+  background: var(--cor-andamento-fundo);
+}
+.decisao > .subtitulo:first-child {
+  margin-top: 0;
+  font-size: var(--texto-secao);
+  color: var(--cor-andamento);
+}
+/* Dentro do bloco destacado os campos precisam de fundo branco para separar. */
+.decisao .tabela { background: var(--cor-superficie); border-radius: var(--raio); }
+
+/* Bloco parado por dependência: existe, mas não é onde se age agora. */
+.decisao--travada {
+  border-color: var(--cor-atencao);
+  border-left-color: var(--cor-atencao);
+  background: var(--cor-atencao-fundo);
+}
+.decisao--travada > .subtitulo:first-child { color: var(--cor-atencao); }
+
+/* Cartão que contém a próxima ação, quando o destaque é da seção inteira. */
+.cartao--foco {
+  border-color: var(--cor-andamento);
+  box-shadow: 0 0 0 3px var(--cor-andamento-fundo);
+}
 .secao-formulario {
   margin: var(--esp-5) 0 0;
   padding-bottom: var(--esp-2);

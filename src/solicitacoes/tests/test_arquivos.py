@@ -73,11 +73,21 @@ def test_dono_baixa_o_proprio_arquivo(client, usuario_clube, solicitacao, arquiv
     assert b"".join(resposta.streaming_content) == PDF
 
 
-def test_outro_usuario_do_clube_nao_baixa(client, solicitacao, arquivo):
-    """Trocar o ID na URL não dá acesso a documento alheio."""
-    outro = Usuario.objects.create_user(username="clube.intruso", password="senha-de-teste")
-    outro.groups.add(Group.objects.get(name=Papel.CLUBE))
-    client.force_login(outro)
+def test_colega_do_clube_baixa_documento_do_time(client, solicitacao, arquivo):
+    """A esteira é do time: baixar é parte de ver o caso (AGENTS.md D35)."""
+    colega = Usuario.objects.create_user(username="clube.colega", password="senha-de-teste")
+    colega.groups.add(Group.objects.get(name=Papel.CLUBE))
+    client.force_login(colega)
+
+    resposta = client.get(reverse("solicitacoes:baixar_arquivo", args=[solicitacao.pk, arquivo.pk]))
+
+    assert resposta.status_code == 200
+
+
+def test_usuario_sem_papel_nao_baixa(client, solicitacao, arquivo):
+    """Trocar o ID na URL não dá acesso a quem não é da casa."""
+    estranho = Usuario.objects.create_user(username="sem.papel", password="senha-de-teste")
+    client.force_login(estranho)
 
     resposta = client.get(reverse("solicitacoes:baixar_arquivo", args=[solicitacao.pk, arquivo.pk]))
 

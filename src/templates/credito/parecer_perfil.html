@@ -96,8 +96,11 @@
           class="formulario" data-confirmar="Recusar este perfil na análise de crédito?">
       {% csrf_token %}
       <div class="campo">
-        <label for="motivo">Motivo</label>
-        <textarea id="motivo" name="motivo" rows="2"></textarea>
+        <label for="motivo">
+          Motivo <span class="obrigatorio" aria-hidden="true">*</span>
+        </label>
+        <textarea id="motivo" name="motivo" rows="2" required></textarea>
+        <small class="ajuda">Obrigatório — o Clube vê este texto.</small>
       </div>
       <div class="acoes">
         <button type="submit" class="botao botao--perigo">Recusar perfil</button>

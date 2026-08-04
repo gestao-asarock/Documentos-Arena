@@ -65,7 +65,8 @@
       </thead>
       <tbody>
         {% for etapa in etapas %}
-          <tr>
+          {# A etapa da vez ganha destaque; o que ainda não chegou fica apagado. #}
+          <tr class="{% if etapa.pk == etapa_atual.pk %}linha--atual{% elif not etapa.esta_decidida %}linha--futura{% endif %}">
             <td>{{ etapa.get_etapa_display }}</td>
             <td>{{ etapa.papel_responsavel }}</td>
             <td>{% include "operacoes/_situacao.html" with status=etapa.status rotulo=etapa.get_status_display %}</td>
@@ -81,8 +82,13 @@
   {% endif %}
 
   {% if etapa_atual and not operacao.esta_encerrada %}
-    <div class="decisao">
-      <h3 class="subtitulo">Decidir: {{ etapa_atual.get_etapa_display }}</h3>
+    {# Sem documentação o fluxo está parado: o destaque azul vai para o bloco de
+       envio, e este fica em âmbar, sinalizando espera e não ação. #}
+    <div class="decisao{% if not documentacao_completa %} decisao--travada{% endif %}">
+      <h3 class="subtitulo">
+        {% if documentacao_completa %}Agora:{% else %}Parado em:{% endif %}
+        {{ etapa_atual.get_etapa_display }}
+      </h3>
       {% if not documentacao_completa %}
         <p class="aviso aviso--atencao">
           {% if situacao.em_analise and not situacao.faltando %}
