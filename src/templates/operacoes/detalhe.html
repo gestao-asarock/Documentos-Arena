@@ -82,8 +82,10 @@
   {% endif %}
 
   {% if etapa_atual and not operacao.esta_encerrada %}
-    {# Sem documentação o fluxo está parado: o destaque azul vai para o bloco de
-       envio, e este fica em âmbar, sinalizando espera e não ação. #}
+    {% comment %}
+      Sem documentação o fluxo está parado: o destaque azul vai para o bloco de
+      envio, e este fica em âmbar, sinalizando espera e não ação.
+    {% endcomment %}
     <div class="decisao{% if not documentacao_completa %} decisao--travada{% endif %}">
       <h3 class="subtitulo">
         {% if documentacao_completa %}Agora:{% else %}Parado em:{% endif %}

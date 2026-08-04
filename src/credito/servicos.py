@@ -102,5 +102,3 @@ def recusar_perfil(habilitacao: Habilitacao, *, usuario, motivo: str) -> Habilit
         usuario=usuario,
     )
     return habilitacao
-
-

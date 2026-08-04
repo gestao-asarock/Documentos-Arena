@@ -55,6 +55,8 @@ FAMILIAS = {
     "rascunho": "andamento",
     # -- Não se aplica -----------------------------------------------------
     "dispensada": "neutro",
+    # Perfil cancelado: a validação parou de importar (solicitacoes/models.py).
+    "nao_se_aplica": "neutro",
     "registrada_externamente": "neutro",
 }
 

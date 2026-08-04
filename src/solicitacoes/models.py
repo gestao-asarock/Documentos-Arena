@@ -11,6 +11,11 @@ from django.utils import timezone
 
 from contrapartes.models import Contraparte, Habilitacao
 
+#: Não é status de nada: é o selo cinza de "não se aplica", usado quando o
+#: perfil está cancelado e a validação deixou de ter o que dizer. Está no mapa
+#: de cores como qualquer status (operacoes/templatetags/situacao.py).
+VALIDACAO_NAO_SE_APLICA = "nao_se_aplica"
+
 
 class StatusSolicitacao(models.TextChoices):
     RASCUNHO = "rascunho", "Rascunho"
@@ -76,6 +81,24 @@ class Solicitacao(models.Model):
     @property
     def esta_cancelada(self) -> bool:
         return self.status == StatusSolicitacao.CANCELADA
+
+    @property
+    def situacao_da_validacao(self) -> dict:
+        """Selo da coluna "Validação" — status bruto e rótulo, para o badge.
+
+        Perfil cancelado não tem validação em curso. Mostrar "Aguardando
+        documentos" num cadastro encerrado faz parecer que alguém ainda espera
+        documento, e é justamente o oposto: dali não sai mais nada. Por isso o
+        selo fica cinza, dizendo que não se aplica.
+        """
+        if self.esta_cancelada:
+            return {"status": VALIDACAO_NAO_SE_APLICA, "rotulo": "Cancelada"}
+        if self.habilitacao is None:
+            return {"status": "", "rotulo": ""}
+        return {
+            "status": self.habilitacao.status,
+            "rotulo": self.habilitacao.get_status_display(),
+        }
 
     @property
     def contratos_em_andamento(self):

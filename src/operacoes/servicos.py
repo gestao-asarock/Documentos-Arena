@@ -127,8 +127,7 @@ def _parecer_da_habilitacao(etapa: Etapa, habilitacao, operacao: Operacao) -> st
         if parecer is None:
             return f"Cumprida na validação do perfil #{habilitacao.pk}."
         return (
-            f"Perfil #{habilitacao.pk} — {parecer.get_veredito_display()}: "
-            f"{parecer.justificativa}"
+            f"Perfil #{habilitacao.pk} — {parecer.get_veredito_display()}: {parecer.justificativa}"
         )
 
     return ""

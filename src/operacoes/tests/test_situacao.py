@@ -11,7 +11,7 @@ from contrapartes.models import StatusHabilitacao
 from documentos.models import StatusDocumento
 from operacoes.estados import StatusEtapa, StatusOperacao
 from operacoes.templatetags.situacao import FAMILIAS, familia, simbolo
-from solicitacoes.models import StatusSolicitacao
+from solicitacoes.models import VALIDACAO_NAO_SE_APLICA, StatusSolicitacao
 
 
 @pytest.mark.parametrize(
@@ -42,6 +42,8 @@ from solicitacoes.models import StatusSolicitacao
         # Não se aplica
         (StatusOperacao.DISPENSADA, "neutro"),
         (StatusEtapa.REGISTRADA_EXTERNAMENTE, "neutro"),
+        # Não é status de nada: o selo cinza do perfil cancelado.
+        (VALIDACAO_NAO_SE_APLICA, "neutro"),
     ],
 )
 def test_familia_de_cada_situacao(status, esperado):

@@ -29,9 +29,7 @@ def fila_juridica():
     chegou é o defeito que a linearidade do fluxo evita (AGENTS.md §4.7).
     """
     candidatos = (
-        Operacao.objects.filter(
-            etapas__etapa=Etapa.JURIDICO, etapas__status=StatusEtapa.PENDENTE
-        )
+        Operacao.objects.filter(etapas__etapa=Etapa.JURIDICO, etapas__status=StatusEtapa.PENDENTE)
         .exclude(status__in=["cancelada", "reprovada", "concluida", "dispensada"])
         .select_related("contraparte", "tipo_operacao", "regra")
         .prefetch_related("etapas", "documentos")
@@ -53,9 +51,7 @@ def aguardando_documentacao():
     são situações diferentes, e dizer só "aguardando documentos" confunde.
     """
     candidatos = (
-        Operacao.objects.filter(
-            etapas__etapa=Etapa.JURIDICO, etapas__status=StatusEtapa.PENDENTE
-        )
+        Operacao.objects.filter(etapas__etapa=Etapa.JURIDICO, etapas__status=StatusEtapa.PENDENTE)
         .exclude(status__in=["cancelada", "reprovada", "concluida", "dispensada"])
         .select_related("contraparte", "tipo_operacao")
         .prefetch_related("etapas", "documentos")

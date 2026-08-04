@@ -12,8 +12,10 @@ Cancelar não apaga: o registro fica, com motivo e autor (AGENTS.md §6).
         data-confirmar="Cancelar {{ rotulo }}? O fluxo será encerrado.">
     {% csrf_token %}
     <div class="campo">
-      {# `required` evita a ida ao servidor só para voltar com erro; a view
-         continua validando, porque o navegador não é fonte de verdade. #}
+      {% comment %}
+        `required` evita a ida ao servidor só para voltar com erro; a view
+        continua validando, porque o navegador não é fonte de verdade.
+      {% endcomment %}
       <label for="motivo-cancelamento">
         Motivo do cancelamento <span class="obrigatorio" aria-hidden="true">*</span>
       </label>

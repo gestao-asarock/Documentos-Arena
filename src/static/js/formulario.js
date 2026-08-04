@@ -141,37 +141,139 @@
     });
   });
 
+  /*
+   * Campos que só existem para pessoa física. Quem manda é o CPF/CNPJ
+   * digitado: acima de 11 dígitos é empresa, e empresa não tem nascimento nem
+   * RG. O servidor aplica a mesma regra em `SolicitacaoForm.clean`.
+   */
+  var campoDocumento = document.querySelector("[data-define-tipo-pessoa]");
+  if (campoDocumento) {
+    var blocosPf = Array.prototype.slice.call(document.querySelectorAll("[data-bloco-pf]"));
+    var avisoPj = document.querySelector("[data-aviso-pj]");
+
+    function ajustarTipoPessoa() {
+      var ehEmpresa = apenasDigitos(campoDocumento.value).length > 11;
+      blocosPf.forEach(function (bloco) {
+        bloco.hidden = ehEmpresa;
+        // Campo escondido não deve enviar valor de um CPF digitado antes.
+        if (ehEmpresa) {
+          bloco.querySelectorAll("input").forEach(function (campo) {
+            campo.value = "";
+          });
+        }
+      });
+      // Campo que some sem explicação parece defeito: o aviso toma o lugar.
+      if (avisoPj) avisoPj.hidden = !ehEmpresa;
+    }
+
+    campoDocumento.addEventListener("input", ajustarTipoPessoa);
+    ajustarTipoPessoa();
+  }
+
+  /*
+   * Endereço por CEP.
+   *
+   * Os campos do endereço nascem escondidos e aparecem preenchidos assim que o
+   * CEP fica completo — sem exigir que a pessoa clique fora do campo. O botão
+   * fica ali para repetir a busca e para abrir os campos à mão quando o CEP não
+   * é encontrado. Sem JS, os campos já vêm visíveis do servidor e o botão não
+   * aparece: dá para digitar tudo na mão.
+   */
   var campoCep = document.querySelector("[data-busca-cep]");
   if (!campoCep) return;
 
-  var url = campoCep.dataset.url || "/solicitacoes/cep/";
+  var detalhes = document.querySelector("[data-endereco-detalhes]");
+  var acaoCep = document.querySelector("[data-acao-cep]");
+  var botaoCep = document.querySelector("[data-preencher-endereco]");
+  var aviso = document.querySelector("[data-cep-aviso]");
+  var formulario = campoCep.form;
+  var url = (formulario && formulario.dataset.urlCep) || "/solicitacoes/cep/";
   var alvos = ["logradouro", "bairro", "cidade", "uf"];
+  var ultimoBuscado = "";
+  var buscando = false;
 
-  campoCep.addEventListener("blur", function () {
+  if (detalhes && detalhes.hasAttribute("data-comeca-escondido")) detalhes.hidden = true;
+  if (acaoCep) acaoCep.hidden = false;
+
+  function avisar(texto) {
+    if (aviso) aviso.textContent = texto || "";
+  }
+
+  function mostrarDetalhes() {
+    if (detalhes) detalhes.hidden = false;
+  }
+
+  function focarPrimeiroVazio() {
+    var numero = document.getElementById("id_numero");
+    if (numero && !numero.value) {
+      numero.focus();
+      return;
+    }
+    var logradouro = document.getElementById("id_logradouro");
+    if (logradouro && !logradouro.value) logradouro.focus();
+  }
+
+  function buscar() {
     var cep = apenasDigitos(campoCep.value);
-    if (cep.length !== 8) return;
+    if (cep.length !== 8) {
+      // Pediu explicitamente com CEP incompleto: abre para digitar à mão.
+      mostrarDetalhes();
+      avisar("Informe os oito dígitos do CEP, ou preencha o endereço à mão.");
+      return;
+    }
+    if (buscando) return;
 
+    buscando = true;
+    ultimoBuscado = cep;
     campoCep.classList.add("campo--carregando");
+    avisar("Buscando endereço…");
 
     fetch(url + "?cep=" + cep, { headers: { "X-Requested-With": "fetch" } })
       .then(function (resposta) {
         return resposta.ok ? resposta.json() : null;
       })
       .then(function (dados) {
-        if (!dados || !dados.encontrado) return;
+        if (!dados || !dados.encontrado) {
+          mostrarDetalhes();
+          avisar("CEP não encontrado. Preencha o endereço à mão.");
+          focarPrimeiroVazio();
+          return;
+        }
+        // Busca nova sobrescreve o que a busca anterior trouxe: CEP corrigido
+        // não pode deixar bairro ou cidade do CEP antigo na tela.
         alvos.forEach(function (nome) {
           var campo = document.getElementById("id_" + nome);
-          // Não sobrescreve o que a pessoa já digitou.
-          if (campo && !campo.value) campo.value = dados[nome] || "";
+          if (campo) campo.value = dados[nome] || "";
         });
-        var numero = document.getElementById("id_numero");
-        if (numero && !numero.value) numero.focus();
+        mostrarDetalhes();
+        avisar("Endereço preenchido. Falta o número.");
+        focarPrimeiroVazio();
       })
       .catch(function () {
-        /* Serviço fora do ar: o usuário digita o endereço à mão. */
+        // Serviço fora do ar: o usuário digita o endereço à mão.
+        mostrarDetalhes();
+        avisar("Não deu para consultar o CEP agora. Preencha o endereço à mão.");
+        focarPrimeiroVazio();
       })
       .finally(function () {
+        buscando = false;
         campoCep.classList.remove("campo--carregando");
       });
+  }
+
+  // Assim que o CEP fica completo, busca sozinho — é o caminho normal.
+  campoCep.addEventListener("input", function () {
+    var cep = apenasDigitos(campoCep.value);
+    if (cep.length === 8 && cep !== ultimoBuscado) buscar();
+    if (cep.length !== 8) ultimoBuscado = "";
   });
+
+  // Enter no CEP busca o endereço; não envia o cadastro pela metade.
+  campoCep.addEventListener("keydown", function (evento) {
+    if (evento.key !== "Enter") return;
+    evento.preventDefault();
+    buscar();
+  });
+
+  if (botaoCep) botaoCep.addEventListener("click", buscar);
 })();

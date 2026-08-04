@@ -42,9 +42,11 @@
           <td>{{ solicitacao.contraparte.get_tipo_pessoa_display }}</td>
           <td>{% include "operacoes/_situacao.html" with status=solicitacao.status rotulo=solicitacao.get_status_display %}</td>
           <td>
-            {% if solicitacao.habilitacao %}
-              {% include "operacoes/_situacao.html" with status=solicitacao.habilitacao.status rotulo=solicitacao.habilitacao.get_status_display %}
-            {% else %}—{% endif %}
+            {% with validacao=solicitacao.situacao_da_validacao %}
+              {% if validacao.rotulo %}
+                {% include "operacoes/_situacao.html" with status=validacao.status rotulo=validacao.rotulo %}
+              {% else %}—{% endif %}
+            {% endwith %}
           </td>
         </tr>
       {% endfor %}

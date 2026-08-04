@@ -3,22 +3,27 @@
  * Toda cor, espaçamento e tipografia sai daqui. Não escreva valor literal
  * dentro de componente: use as variáveis.
  *
- * Paleta sóbria e institucional da ASAROCK. Cor é reservada para estado.
- * Não usar as cores do Corinthians — o sistema é da gestora, não do clube.
+ * Preto e branco do Corinthians, em escala de cinza (AGENTS.md D45). Nenhum
+ * dos dois puros: #000 sobre #fff cansa em jornada inteira de trabalho, e
+ * chapa a hierarquia entre título, texto e apoio. O grafite e o quase-branco
+ * dão o mesmo contraste com menos ruído.
+ *
+ * Cor continua reservada para estado — as cinco famílias abaixo são as únicas
+ * cores saturadas do sistema, e por isso saltam sobre o cinza.
  */
 
 :root {
   /* Neutros — dominam a interface */
-  --cor-fundo: #f7f8fa;
+  --cor-fundo: #f4f5f6;
   --cor-superficie: #ffffff;
-  --cor-borda: #dfe3e8;
-  --cor-selecao: #eef2f7;
-  --cor-texto: #1c2126;
-  --cor-texto-suave: #5b6673;
+  --cor-borda: #e0e2e5;
+  --cor-selecao: #eeeff1;
+  --cor-texto: #24272b;
+  --cor-texto-suave: #62676e;
 
-  /* Marca — usada com parcimônia (cabeçalho, ação primária) */
-  --cor-primaria: #1f3a5f;
-  --cor-primaria-clara: #2d5a8f;
+  /* Marca — grafite do Clube, usado com parcimônia (cabeçalho, ação primária) */
+  --cor-primaria: #2b2e33;
+  --cor-primaria-clara: #43474e;
 
   /*
    * Estados — cinco famílias, e nada além delas. O mapa de status → família
@@ -90,7 +95,12 @@ body {
 
 h1 { font-size: var(--texto-titulo); margin: 0; line-height: 1.25; }
 h2 { font-size: var(--texto-secao); margin: 0 0 var(--esp-3); }
-a { color: var(--cor-primaria); }
+/*
+ * Sem azul na paleta, a cor deixou de distinguir link de texto: quem faz esse
+ * trabalho agora é o sublinhado. Não o remova de link do corpo da página.
+ */
+a { color: var(--cor-primaria); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
 
 /* Cabeçalho ------------------------------------------------------------- */
 
@@ -106,11 +116,27 @@ a { color: var(--cor-primaria); }
 .cabecalho__marca {
   display: flex;
   align-items: center;
+  gap: var(--esp-3);
   font-weight: 600;
   font-size: 17px;
   color: #fff;
   text-decoration: none;
 }
+/*
+ * O brasão tem contorno preto e fica sobre o grafite do cabeçalho, onde se
+ * perde. A pastilha branca é o que o separa do fundo — e é como o próprio
+ * clube aplica a marca sobre escuro.
+ */
+.cabecalho__brasao {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: #fff;
+}
+.cabecalho__brasao img { width: 24px; height: 24px; display: block; }
 .cabecalho__nav { display: flex; gap: var(--esp-2); flex: 1; }
 
 /*
@@ -140,7 +166,7 @@ a { color: var(--cor-primaria); }
 
 /*
  * O botão discreto é escuro sobre claro no corpo da página; no cabeçalho, que
- * é azul-escuro, essa mesma regra deixava "Sair" preto sobre azul, ilegível.
+ * é grafite, essa mesma regra deixava "Sair" quase invisível sobre o fundo.
  */
 .cabecalho .botao--discreto {
   min-height: 34px;
@@ -332,6 +358,9 @@ a { color: var(--cor-primaria); }
 
 .formulario { display: flex; flex-direction: column; gap: var(--esp-4); }
 .campo { display: flex; flex-direction: column; gap: var(--esp-1); }
+/* Bloco do endereço: some inteiro até o CEP ser consultado, e por isso precisa
+   repetir o espaçamento do formulário — o `gap` do pai não atravessa a caixa. */
+.campos-endereco { display: flex; flex-direction: column; gap: var(--esp-4); }
 .formulario label {
   font-size: var(--texto-p);
   font-weight: 500;
@@ -575,5 +604,22 @@ input[type="radio"] {
   border-radius: var(--raio);
   padding: var(--esp-6);
 }
-.login__titulo { margin-bottom: var(--esp-1); }
-.login__subtitulo { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); margin-top: 0; }
+/* Cabeçalho da tela centrado, para acompanhar o brasão acima dele. */
+.login__titulo { margin-bottom: var(--esp-1); text-align: center; }
+.login__subtitulo {
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+  margin-top: 0;
+  text-align: center;
+}
+/*
+ * O brasão só aparece aqui em tamanho grande: é a única tela em que a pessoa
+ * não está trabalhando, e onde identificar de quem é o sistema tem valor. Nas
+ * telas de trabalho ele fica pequeno no cabeçalho e sai da frente.
+ */
+.login__brasao {
+  display: block;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto var(--esp-4);
+}

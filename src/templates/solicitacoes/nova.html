@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load dicionario %}
 
 {% block titulo %}Nova solicitação — Documentos Arena{% endblock %}
 
@@ -11,23 +10,40 @@
     <p class="aviso aviso--erro">{{ form.non_field_errors|join:" " }}</p>
   {% endif %}
 
-  <form method="post" class="formulario" data-url-cep="{% url 'solicitacoes:buscar_cep' %}">
+  {% comment %}
+    `novalidate`: campo obrigatório escondido faz o navegador recusar o envio
+    sem mostrar nada ("invalid form control is not focusable"). Quem aponta o
+    que falta é o servidor, que valida de qualquer forma.
+  {% endcomment %}
+  <form method="post" class="formulario" data-url-cep="{% url 'solicitacoes:buscar_cep' %}" novalidate>
     {% csrf_token %}
 
-    <h2 class="secao-formulario secao-formulario--primeira">Evento ou serviço</h2>
-    {% for campo in form %}
-      {% if campo.name in form.BLOCOS %}
-        <h2 class="secao-formulario">{{ form.BLOCOS|get:campo.name }}</h2>
+    <h2 class="secao-formulario secao-formulario--primeira">Contraparte</h2>
+    {% for campo in form.campos_da_pessoa %}
+      {% include "_campo.html" %}
+      {% if campo.name == form.CAMPOS_PF|last %}
+        {% comment %}
+          Ocupa o lugar dos campos escondidos: sem isto eles somem ao digitar um
+          CNPJ e ninguém sabe se foram embora de propósito. Quem o revela é o JS.
+        {% endcomment %}
+        <p class="ajuda" data-aviso-pj hidden>{{ form.AVISO_PJ }}</p>
       {% endif %}
-      <div class="campo{% if campo.errors %} campo--erro{% endif %}">
-        <label for="{{ campo.id_for_label }}">
-          {{ campo.label }}{% if campo.field.required %} <span class="obrigatorio">*</span>{% endif %}
-        </label>
-        {{ campo }}
-        {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
-        {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
-      </div>
     {% endfor %}
+
+    <h2 class="secao-formulario">Endereço</h2>
+    {% include "_campo.html" with campo=form.cep %}
+
+    {# Sem JS o botão não faria nada: quem o mostra é o próprio script. #}
+    <div class="acoes" data-acao-cep hidden>
+      <button type="button" class="botao botao--discreto" data-preencher-endereco>Preencher endereço</button>
+      <span class="ajuda" data-cep-aviso role="status" aria-live="polite"></span>
+    </div>
+
+    <div class="campos-endereco" data-endereco-detalhes{% if not form.endereco_preenchido %} data-comeca-escondido{% endif %}>
+      {% for campo in form.campos_do_endereco %}
+        {% include "_campo.html" %}
+      {% endfor %}
+    </div>
 
     <p class="ajuda">
       Os documentos exigidos são definidos automaticamente pelo CPF/CNPJ informado e pelo valor.

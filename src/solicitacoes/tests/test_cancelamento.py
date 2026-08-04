@@ -16,6 +16,7 @@ from contrapartes.models import Habilitacao, StatusHabilitacao
 from operacoes.estados import StatusOperacao
 from operacoes.models import Operacao, TipoOperacao
 from operacoes.servicos import enquadrar
+from operacoes.templatetags.situacao import familia
 from solicitacoes.models import Solicitacao, StatusSolicitacao
 from solicitacoes.servicos import obter_ou_criar_contraparte
 
@@ -79,6 +80,51 @@ def test_cancelar_solicitacao_guarda_motivo_e_autor(client, clube, solicitacao):
     assert solicitacao.motivo_cancelamento == "Evento desmarcado pelo contratante."
     assert solicitacao.cancelada_por == clube
     assert solicitacao.data_cancelamento is not None
+
+
+@pytest.fixture
+def perfil_em_validacao(clube):
+    """Perfil com a habilitação **ligada a ele** — o que a lista mostra.
+
+    A fixture `solicitacao` cria a habilitação na contraparte sem preencher o
+    FK do perfil; aqui a ligação é justamente o que está sob teste.
+    """
+    contraparte, _ = obter_ou_criar_contraparte(
+        documento="00000000000191", dados={"nome": "Fornecedora Fictícia Ltda"}
+    )
+    habilitacao = Habilitacao.objects.create(
+        contraparte=contraparte, status=StatusHabilitacao.AGUARDANDO_DOCUMENTOS
+    )
+    return Solicitacao.objects.create(
+        contraparte=contraparte,
+        criada_por=clube,
+        habilitacao=habilitacao,
+        status=StatusSolicitacao.EM_HABILITACAO,
+    )
+
+
+def test_validacao_de_perfil_cancelado_fica_cinza(perfil_em_validacao, clube):
+    """Cadastro encerrado não tem validação em curso a mostrar.
+
+    A lista mostrava "Aguardando documentos" ao lado de "Cancelado", como se
+    alguém ainda esperasse alguma coisa daquele perfil.
+    """
+    assert perfil_em_validacao.situacao_da_validacao["rotulo"] == "Aguardando documentos"
+
+    perfil_em_validacao.cancelar("Evento desmarcado.", usuario=clube)
+
+    validacao = perfil_em_validacao.situacao_da_validacao
+    assert validacao["rotulo"] == "Cancelada"
+    assert familia(validacao["status"]) == "neutro"
+
+
+def test_perfil_sem_habilitacao_nao_mostra_selo(clube):
+    contraparte, _ = obter_ou_criar_contraparte(
+        documento="58974790890", dados={"nome": "Contratante Fictício"}
+    )
+    perfil = Solicitacao.objects.create(contraparte=contraparte, criada_por=clube)
+
+    assert perfil.situacao_da_validacao == {"status": "", "rotulo": ""}
 
 
 def test_cancelamento_exige_motivo(solicitacao, clube):

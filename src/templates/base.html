@@ -5,16 +5,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Documentos Arena{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
   {# Incremente o ?v= ao editar CSS ou JS: sem isso o navegador serve a versão antiga. #}
-  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=8">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=10">
   {# HTMX entra quando a primeira tela precisar (upload, polling de análise). #}
   {# Baixe htmx.min.js para src/static/js/ — nada de CDN, o servidor é privado. #}
-  <script src="{% static 'js/formulario.js' %}?v=5" defer></script>
+  <script src="{% static 'js/formulario.js' %}?v=6" defer></script>
 </head>
 <body>
   {% if user.is_authenticated %}
     <header class="cabecalho">
-      <a class="cabecalho__marca" href="{% url 'operacoes:lista' %}">Documentos Arena</a>
+      <a class="cabecalho__marca" href="{% url 'operacoes:lista' %}">
+        {# Decorativo: o nome ao lado já identifica o sistema. #}
+        <span class="cabecalho__brasao"><img src="{% static 'img/marca.png' %}" alt="" width="24" height="24"></span>
+        Documentos Arena
+      </a>
       {# A aba atual sai do app da URL resolvida: nenhuma view precisa informá-la. #}
       {% with secao=request.resolver_match.app_name %}
       <nav class="cabecalho__nav">

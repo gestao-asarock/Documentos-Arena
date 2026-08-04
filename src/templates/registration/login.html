@@ -2,8 +2,12 @@
 
 {% block titulo %}Entrar — Documentos Arena{% endblock %}
 
+{% load static %}
+
 {% block conteudo %}
 <div class="login">
+  {# Decorativo: o título logo abaixo já diz o que é. #}
+  <img class="login__brasao" src="{% static 'img/marca.png' %}" alt="" width="72" height="72">
   <h1 class="login__titulo">Documentos Arena</h1>
   <p class="login__subtitulo">ASAROCK Asset Management — FII ARENA</p>
 

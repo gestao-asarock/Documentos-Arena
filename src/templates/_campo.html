@@ -1,0 +1,14 @@
+{% comment %}
+  Um campo de formulário: rótulo, controle, ajuda e erro.
+
+  O asterisco também aparece nos campos só de pessoa física, que são
+  obrigatórios para CPF mas ficam escondidos para CNPJ.
+{% endcomment %}
+<div class="campo{% if campo.errors %} campo--erro{% endif %}"{% if "data-so-pf" in campo.field.widget.attrs %} data-bloco-pf{% endif %}>
+  <label for="{{ campo.id_for_label }}">
+    {{ campo.label }}{% if campo.field.required or "data-so-pf" in campo.field.widget.attrs %} <span class="obrigatorio">*</span>{% endif %}
+  </label>
+  {{ campo }}
+  {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+  {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
+</div>

@@ -41,9 +41,7 @@ def crm():
 
 @pytest.fixture
 def habilitacao(crm):
-    contraparte = Contraparte.objects.create(
-        nome="Contratante Fictício", documento="58974790890"
-    )
+    contraparte = Contraparte.objects.create(nome="Contratante Fictício", documento="58974790890")
     registro = Habilitacao.objects.create(
         contraparte=contraparte, status=StatusHabilitacao.EM_CREDITO
     )

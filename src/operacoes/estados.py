@@ -149,6 +149,4 @@ class StatusEtapa(models.TextChoices):
 #: Crédito está aqui: **existe uma análise de crédito e ela acontece na esteira
 #: do perfil** (D30). O contrato não a refaz; se for preciso reavaliar por
 #: mudança de faixa ou de tipo, isso é uma revalidação do perfil.
-ETAPAS_DA_HABILITACAO = frozenset(
-    {Etapa.TRIAGEM, Etapa.DUE_DILIGENCE, Etapa.RISCO_CREDITO}
-)
+ETAPAS_DA_HABILITACAO = frozenset({Etapa.TRIAGEM, Etapa.DUE_DILIGENCE, Etapa.RISCO_CREDITO})

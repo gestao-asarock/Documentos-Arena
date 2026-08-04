@@ -80,9 +80,7 @@ class Command(BaseCommand):
 
         if not operacao.documentacao_completa:
             esperando = (
-                situacao["em_analise"]
-                and not situacao["faltando"]
-                and not situacao["com_problema"]
+                situacao["em_analise"] and not situacao["faltando"] and not situacao["com_problema"]
             )
             return (
                 StatusOperacao.EM_ANALISE_DOCUMENTAL
@@ -115,8 +113,7 @@ class Command(BaseCommand):
                 return habilitacao.status
             return StatusHabilitacao.EM_COMPLIANCE
         if any(
-            d.status in {StatusDocumento.ENVIADO, StatusDocumento.PROCESSANDO}
-            for d in documentos
+            d.status in {StatusDocumento.ENVIADO, StatusDocumento.PROCESSANDO} for d in documentos
         ):
             return StatusHabilitacao.EM_ANALISE_DOCUMENTAL
         return StatusHabilitacao.AGUARDANDO_DOCUMENTOS

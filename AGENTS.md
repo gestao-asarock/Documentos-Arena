@@ -718,6 +718,36 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   Trillia e Serasa entram **depois**, um de cada vez. Integração é o que mais muda e o
   que menos controlamos — construir o fluxo em cima dela é refazer os dois. Trabalho de
   integração já pronto fica em branch, fora da `main`, até a vez dele chegar.
+- **D43 — Cadastro do perfil é todo obrigatório, com duas exceções nomeadas.** Decisão de
+  04/08/2026. Campo opcional no cadastro vira pendência descoberta lá na frente, na
+  triagem ou no compliance, quando corrigir custa uma volta inteira. Exceções: o
+  **complemento** do endereço (a maioria não tem — exigir só produz "n/a") e os campos que
+  **só existem para pessoa física** (data de nascimento e RG), escondidos e dispensados
+  quando o documento é CNPJ. Quem decide PF ou PJ é o CPF/CNPJ digitado, na tela e no
+  `clean` do formulário — o usuário nunca escolhe. **A exceção é dita na tela**: os dois
+  campos levam o asterisco e a ajuda "obrigatório para pessoa física, não se aplica a
+  CNPJ", e ao digitar um CNPJ um aviso ocupa o lugar deles. Campo que some sem explicação
+  parece defeito do sistema.
+- **D44 — O endereço se preenche sozinho ao completar o CEP.** Refina D24 no lado da tela.
+  A busca dispara no oitavo dígito, sem exigir que a pessoa clique fora do campo; os
+  campos do endereço ficam escondidos até a consulta e só então aparecem preenchidos, com
+  o foco no **número**. O botão "Preencher endereço" continua na tela para repetir a busca
+  e para abrir os campos à mão quando o CEP não é encontrado ou o ViaCEP não responde —
+  nunca há beco sem saída. Sem JS os campos já vêm visíveis do servidor.
+- **D45 — Identidade do Clube, em escala de cinza.** Decisão de 04/08/2026, que
+  **reverte** a regra anterior de §8 ("não use as cores do Corinthians"). O sistema é
+  operado pelo Clube e visto por ele; vestir a casa do cliente é o esperado. Mas **preto e
+  branco puros não**: `#000` sobre `#fff` cansa em jornada inteira e achata a hierarquia
+  entre título, texto e apoio. Os neutros são grafite (`#2b2e33`) e quase-branco
+  (`#f4f5f6`). **As cinco famílias de estado continuam coloridas e intocadas** — com o
+  resto em cinza elas ficam ainda mais legíveis, e é o único lugar do sistema com cor
+  saturada. Como a cor deixou de distinguir link de texto, **link do corpo leva
+  sublinhado, sempre**.
+- **D46 — O brasão é ativo derivado, não o arquivo entregue.** O original é um JPEG cujo
+  "quadriculado de transparência" são pixels de verdade: aplicado direto, vira um
+  tabuleiro cinza no cabeçalho e na aba. `docs/marca/gerar.py` recorta o fundo e produz
+  `src/static/img/marca.png` e `favicon.ico`. Fonte e script ficam versionados; **não edite
+  os derivados à mão** — troque o original e rode o script.
 - **D1 — Django em vez de FastAPI.** O Django Admin dá ao jurídico e ao compliance uma
   interface de revisão sem que a construamos, e permite editar a tabela de regras.
   Preserve isso: mantenha os modelos registrados e utilizáveis no Admin.
@@ -912,10 +942,11 @@ O sistema será visto pelo Clube. "Apresentável" aqui significa **coerente**, n
 
 - Defina paleta, tipografia e escala de espaçamento como **variáveis CSS** em um único
   arquivo, e use só elas. Nada de cor ou tamanho escrito direto no meio de um componente.
-- Paleta sóbria e institucional, com neutros dominando e cor reservada para estado
-  (pendente, aprovado, reprovado) — o sistema é ferramenta de trabalho, não vitrine.
-  **Não use as cores do Corinthians**: é sistema da ASAROCK para gerir o fundo, e imitar a
-  identidade do clube confunde de quem é a ferramenta.
+- Paleta sóbria, com neutros dominando e cor reservada para estado (pendente, aprovado,
+  reprovado) — o sistema é ferramenta de trabalho, não vitrine. Os neutros são o **preto e
+  branco do Clube em escala de cinza**, e o brasão aparece no cabeçalho e no login
+  (D45) — decisão de 04/08/2026, que **substitui** a regra anterior de não usar a
+  identidade do Corinthians.
 - **Cor de estado vem de um mapa único**, em `operacoes/templatetags/situacao.py`, e são
   **cinco famílias, nunca mais**:
 

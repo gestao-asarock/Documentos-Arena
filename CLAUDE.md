@@ -170,6 +170,37 @@ cadastral agora é tabela por tipo de pessoa e faixa de valor, com grupos de alt
 (holerite **ou** declaração de IR). Dedução de PF/PJ pelo CPF/CNPJ em
 `contrapartes.models.deduzir_tipo_pessoa`.
 
+**Cadastro do perfil: tudo obrigatório** (AGENTS.md D43). Só escapam o complemento do
+endereço e, para CNPJ, data de nascimento e RG — que somem da tela pelo próprio CPF/CNPJ
+digitado, dizendo por quê: os dois campos trazem a ajuda "obrigatório para pessoa física"
+e, no lugar deles, aparece um aviso quando o documento é de empresa. **O endereço se preenche ao completar o CEP** (D44): busca automática no oitavo
+dígito, campos escondidos até lá, botão "Preencher endereço" para repetir a busca ou abrir
+os campos à mão. Campo de formulário agora sai do partial `src/templates/_campo.html`.
+
+> O formulário vai com `novalidate`: campo obrigatório escondido faz o navegador recusar o
+> envio sem mostrar nada. Quem aponta o que falta é o servidor.
+
+**Identidade visual do Clube, em cinza** (AGENTS.md D45, D46). Os neutros viraram grafite
+e quase-branco; as cinco cores de estado seguem intocadas e agora saltam mais. Link do
+corpo leva sublinhado, porque sem azul a cor não distingue mais link de texto. O brasão
+está no cabeçalho (pastilha branca, senão o contorno preto some no grafite) e grande na
+tela de login.
+
+> **Os arquivos da marca são gerados, não editados.** O original entregue é um JPEG com o
+> quadriculado de transparência *desenhado nos pixels*. `docs/marca/gerar.py` recorta o
+> fundo e escreve `src/static/img/marca.png` e `favicon.ico`. Precisa de Pillow, que **não**
+> está nos requirements — é ferramenta de uma vez só (`pip install pillow` quando precisar).
+
+**Selo de validação some quando o perfil é cancelado**: vira "Cancelada" em cinza. Mostrar
+"Aguardando documentos" num cadastro encerrado sugeria que alguém ainda esperava algo. A
+regra está em `Solicitacao.situacao_da_validacao`, e `VALIDACAO_NAO_SE_APLICA` entrou no
+mapa de cores como qualquer status.
+
+> **`{# … #}` é de uma linha só.** O lexer do Django não usa `re.DOTALL`: em duas linhas o
+> "comentário" vira **texto visível na página**, sem erro nenhum. Comentário de várias
+> linhas é `{% comment %}`. `tests/test_templates.py` varre os templates atrás disso —
+> três casos já tinham escapado para a `main`.
+
 **Telas da Fase 1 prontas:** `/solicitacoes/` — formulário de entrada do Clube, detalhe com
 **linha do tempo do fluxo** (`solicitacoes/fluxo.py`), kit cadastral com o que falta, envio
 de documentos com as validações de D18 (`documentos/validadores.py`) e lista do que já foi

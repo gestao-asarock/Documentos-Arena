@@ -93,7 +93,7 @@ def test_aprovado_segue_o_fluxo(contrato, crm):
 
 
 def test_fila_do_juridico_diz_o_motivo_da_espera(contrato, crm):
-    """"Falta enviar" e "em conferência" são situações diferentes."""
+    """ "Falta enviar" e "em conferência" são situações diferentes."""
     esperando = aguardando_documentacao()
     assert esperando[0].motivo_da_espera == "Aguardando o Clube enviar os documentos"
 

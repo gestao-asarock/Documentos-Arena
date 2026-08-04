@@ -61,9 +61,7 @@ def contrato_desatualizado(contraparte, crm):
     operacao.documentos.add(documento)
 
     # Grava o estado antigo direto, sem passar pelo serviço.
-    Operacao.objects.filter(pk=operacao.pk).update(
-        status=StatusOperacao.AGUARDANDO_DOCUMENTOS
-    )
+    Operacao.objects.filter(pk=operacao.pk).update(status=StatusOperacao.AGUARDANDO_DOCUMENTOS)
     operacao.refresh_from_db()
     return operacao
 
