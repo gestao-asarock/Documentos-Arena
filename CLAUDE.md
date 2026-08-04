@@ -18,6 +18,25 @@ compliance via Trillia (mockado). Fase de **MVP**: mínimo, limpo e apresentáve
 Regra de negócio vem do *Guia de Regras de Compliance — FII ARENA v2.0*. Se este repo
 divergir do guia, **o guia prevalece**.
 
+## 🎯 Prioridade em vigor — leia antes de propor qualquer coisa
+
+**O fluxo primeiro. Integração depois.** Decisão do responsável em 04/08/2026
+(AGENTS.md D42 e §1). Isso vale acima de qualquer outra sugestão de ordem de trabalho,
+inclusive das listas de "próximo passo" mais abaixo neste arquivo.
+
+- **Agora:** deixar o fluxo interno funcional e robusto — cadastro, kit cadastral,
+  triagem, pareceres, contrato, máquina de estados, permissões, telas, mensagens de erro.
+- **Depois, uma de cada vez:** IA documental, API de compliance (Trillia) e Serasa.
+- **Não** abra frente nova de integração externa, nem "só o esqueleto", sem o responsável
+  dizer que a vez dela chegou.
+- Achou problema de fluxo no meio de outra tarefa? Ele tem precedência. Diga e conserte.
+
+**A triagem por IA já está escrita e testada, mas fora da `main`:** branch
+`feat/triagem-ia` (AGENTS.md §9.4). Não a reescreva do zero e não a traga de volta sem
+pedido — ela espera a vez. O que ela tem de **correção de fluxo**, e não de integração,
+pode vir antes num commit separado: o principal é o `STATUS_EM_ANALISE`, que faz
+documento já analisado contar como "em análise" em vez de pendência.
+
 ## Antes de escrever código, confira
 
 - Código nosso em **português**; código do Django, intocado em inglês (AGENTS.md §3).
@@ -195,18 +214,22 @@ parecer, não o dossiê.
 `contas/consultas.criado_dentro_da_casa`. Ver é do time; cancelar e excluir continuam
 com quem abriu o registro (`operacoes.permissoes.eh_dono_ou_interno`).
 
-**Ainda sem IA:** a conferência é visual. A task Celery, a extração e a evidência visual
-entram no próximo incremento — e é lá que o `htmx.min.js` passa a ser necessário.
+**Ainda sem IA na `main`, e é assim de propósito:** a conferência é visual. A task Celery,
+a extração e a evidência visual existem prontas na branch `feat/triagem-ia`, e entram
+quando o fluxo estiver firme (D42). Enquanto isso, a triagem manual é o comportamento
+oficial — trate-a como tal, não como provisório a ser tolerado: se ela está confusa ou
+frágil, **é ali que se trabalha agora**.
 
 > **Ao escrever migration à mão**, inclua `verbose_name="ID"` no `BigAutoField` da chave
 > primária. Sem isso o Django gera uma migration corretiva no `makemigrations` seguinte
 > (foi o que produziu `0003_alter_habilitacao_id` e companhia — inofensivas, mas ruído).
 
 **Pendência conhecida:** baixar `htmx.min.js` para `src/static/js/` quando a primeira tela
-precisar de interatividade (upload, polling de análise). Nada de CDN.
+precisar de interatividade. Nada de CDN. (Já baixado na branch `feat/triagem-ia`, versão
+2.0.4 — dá para trazer só esse arquivo se alguma tela de fluxo precisar antes.)
 
-**Próximo passo:** upload de documento (`DocumentoOperacao` + armazenamento) e o pipeline
-de análise por IA.
+**Próximo passo:** robustez do fluxo, não integração (D42). O que entra aqui sai de
+conversa com o responsável — não presuma a lista.
 
 ## Perguntas em aberto
 
@@ -225,6 +248,10 @@ Ao ser respondida, a pergunta sai daqui e vira decisão no AGENTS.md §7.
 | P8 | O check final ("ambas as análises conferidas") é feito por quem — a própria área, ou um segundo par de olhos? | Define se há etapa de conferência separada dos pareceres. |
 
 ## Pendências fora do código
+
+> Estas são de **integração**: seguem valendo, mas estão em segundo plano até o fluxo
+> ficar robusto (D42). Continuam aqui porque destravá-las leva tempo de calendário e o
+> pedido pode ser feito em paralelo, sem consumir tempo de código.
 
 - Obter acesso ao portal do desenvolvedor da Trillia: endpoints, payloads e preços.
 - Migrar o Gemini para API paga antes de qualquer demo com dado real.

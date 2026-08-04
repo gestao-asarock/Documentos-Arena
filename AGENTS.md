@@ -40,6 +40,28 @@ fluxo piloto** (§4.3) de ponta a ponta. Os demais enquadramentos só entram dep
 o piloto for validado com os times. O motor de regras (§4.4) já nasce genérico, mas a
 tabela de regras começa preenchida com um caso só.
 
+> ### 🎯 Prioridade em vigor: o fluxo primeiro, a integração depois
+>
+> **Decisão do responsável em 04/08/2026 (D42). Vale sobre qualquer outra sugestão de
+> ordem de trabalho.**
+>
+> O foco é **100%** em deixar o fluxo interno funcional e robusto — cadastro, kit,
+> triagem, pareceres, contrato, estados, permissões, telas. Só depois disso entram as
+> integrações externas: **IA documental, API de compliance (Trillia) e Serasa**.
+>
+> Por quê: integração é a parte que mais muda e a que menos controlamos — contrato de
+> API, cota, preço, disponibilidade. Amarrar o fluxo a ela antes de o fluxo estar firme
+> significa refazer os dois. Um fluxo sólido com decisão manual **já é demonstrável**;
+> uma integração sobre fluxo instável não é.
+>
+> Na prática, enquanto esta prioridade valer:
+>
+> - Não abra frente nova de integração externa, nem "só o esqueleto".
+> - Achou um problema de fluxo no meio de outra coisa? Ele tem precedência.
+> - Trabalho de integração já feito fica **em branch**, não na `main` (§9.4).
+> - As interfaces em `integracoes/` continuam valendo como desenho (§5): quando a vez
+>   delas chegar, o fluxo não deve precisar mudar para recebê-las.
+
 ---
 
 ## 2. Stack e decisões travadas
@@ -687,6 +709,15 @@ de um fundo de investimento. Não é opcional:
 
 Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.**
 
+> **D36 a D41 estão reservadas** para a triagem por IA, que vive na branch
+> `feat/triagem-ia` e ainda não foi integrada à `main` (§9.4). Não reutilize esses
+> números: a branch já os usa, e renumerar depois quebraria as referências no código.
+
+- **D42 — O fluxo vem antes da integração.** Decisão de 04/08/2026, detalhada em §1.
+  Toda energia vai para o fluxo interno ficar funcional e robusto; IA documental,
+  Trillia e Serasa entram **depois**, um de cada vez. Integração é o que mais muda e o
+  que menos controlamos — construir o fluxo em cima dela é refazer os dois. Trabalho de
+  integração já pronto fica em branch, fora da `main`, até a vez dele chegar.
 - **D1 — Django em vez de FastAPI.** O Django Admin dá ao jurídico e ao compliance uma
   interface de revisão sem que a construamos, e permite editar a tabela de regras.
   Preserve isso: mantenha os modelos registrados e utilizáveis no Admin.
@@ -980,6 +1011,24 @@ Nada vai para a EC2 sem `pytest` verde. O procedimento:
 Se você alterou comportamento coberto por teste, o teste é atualizado no mesmo commit.
 Nunca apague nem marque `skip` num teste para fazer a suíte passar; isso é defeito
 escondido, não teste corrigido.
+
+### 9.4 Integração fica em branch enquanto a prioridade for o fluxo
+
+Enquanto D42 valer (§1), a `main` carrega **o fluxo**, e cada integração externa vive na
+sua própria branch até ser chamada. Nada de deixar meia integração na `main` "só para não
+perder": ela vira peso morto que todo mundo precisa entender e nenhum teste exercita de
+verdade.
+
+Branches em espera hoje:
+
+| Branch | O que traz | Estado |
+|---|---|---|
+| `feat/triagem-ia` | Triagem de identificação e comprovante por IA, com evidência visual e conferência campo a campo pelo CRM. Decisões D36 a D41. | Completa e testada (314 testes verdes na época), **fora da `main`** |
+
+Ao retomar uma dessas branches: rebase sobre a `main` do momento, rode a suíte inteira, e
+só então converse sobre merge. Se algo daquela branch for **correção de fluxo** e não
+integração — o caso do `STATUS_EM_ANALISE` em `feat/triagem-ia` —, isso pode e deve vir
+para a `main` antes, num commit próprio e separado.
 
 ---
 
