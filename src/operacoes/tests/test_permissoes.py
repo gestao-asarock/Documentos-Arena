@@ -28,7 +28,8 @@ def etapas(criar_operacao, regra_piloto, usuario):
     ("papel", "etapa", "permitido"),
     [
         (Papel.CRM, Etapa.TRIAGEM, True),
-        (Papel.COMPLIANCE, Etapa.TRIAGEM, False),
+        # Compliance ajuda na triagem: é quem sofre documento mal triado (D34).
+        (Papel.COMPLIANCE, Etapa.TRIAGEM, True),
         (Papel.COMPLIANCE, Etapa.DUE_DILIGENCE, True),
         (Papel.JURIDICO, Etapa.DUE_DILIGENCE, False),
         (Papel.JURIDICO, Etapa.JURIDICO, True),
@@ -40,10 +41,10 @@ def test_papel_decide_apenas_a_propria_etapa(etapas, papel, etapa, permitido):
     assert pode_decidir(_usuario(papel), etapas[etapa]) is permitido
 
 
-@pytest.mark.parametrize("papel", [Papel.CRM, Papel.COMPLIANCE])
-def test_risco_credito_e_registrado_por_crm_ou_compliance(etapas, papel):
-    """Risco não tem usuário no MVP; o parecer é registrado em seu nome (D9)."""
-    assert pode_decidir(_usuario(papel), etapas[Etapa.RISCO_CREDITO])
+def test_risco_credito_e_registrado_pelo_crm(etapas):
+    """Risco não tem usuário no MVP; o CRM registra em seu nome (D9, D34)."""
+    assert pode_decidir(_usuario(Papel.CRM), etapas[Etapa.RISCO_CREDITO])
+    assert not pode_decidir(_usuario(Papel.COMPLIANCE), etapas[Etapa.RISCO_CREDITO])
 
 
 def test_administrador_decide_qualquer_etapa(etapas):

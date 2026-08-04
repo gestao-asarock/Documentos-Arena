@@ -20,10 +20,12 @@
     </p>
     <p><a class="botao" href="{% url 'operacoes:nova' %}">Criar contrato</a></p>
     {% for operacao in contraparte.operacoes.all %}
-      <p>
+      <p class="contrato-do-perfil">
         <a class="botao botao--discreto" href="{% url 'operacoes:detalhe' operacao.pk %}">
           Contrato #{{ operacao.pk }} — {{ operacao.descricao }}
         </a>
+        {% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}
+        <a class="ajuda" href="{% url 'operacoes:assinatura' operacao.pk %}">ver checagens</a>
       </p>
     {% endfor %}
   {% endif %}

@@ -5,9 +5,14 @@
 
 {% block conteudo %}
 <div class="pagina__topo">
-  <h1>Fila de análise documental</h1>
+  <h1>Triagem de documentos</h1>
   <span class="contador">{{ documentos|length }} documento{{ documentos|length|pluralize:",s" }} aguardando</span>
 </div>
+
+<p class="ajuda">
+  Conferência dos documentos enviados — cadastrais e de contrato. Confira se o conteúdo
+  bate com os dados declarados antes de aprovar.
+</p>
 
 {% if documentos %}
   <table class="tabela">

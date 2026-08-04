@@ -129,15 +129,26 @@ def test_tela_juridica_mostra_a_conferencia(client, contrato, juridico):
 
 
 def test_conferencia_nao_aparece_em_outras_etapas(client, contraparte, crm):
-    """Só a revisão jurídica confere o termo."""
+    """A conferência é da revisão jurídica; na assinatura, por exemplo, não aparece."""
     operacao = Operacao.objects.create(
         contraparte=contraparte,
         tipo_operacao=TipoOperacao.objects.get(nome="Aluguel de Espaço"),
-        descricao="Ainda sem documentos",
+        descricao="Já revisado",
         valor_total=Decimal("1000.00"),
         criada_por=crm,
     )
     enquadrar(operacao, usuario=crm)
+
+    for tipo in operacao.documentos_pendentes():
+        documento = DocumentoCadastral.objects.create(
+            contraparte=contraparte, tipo=tipo, status=StatusDocumento.APROVADO
+        )
+        ArquivoDocumento.objects.create(documento=documento, arquivo="cadastral/termo.pdf")
+        operacao.documentos.add(documento)
+    avancar(operacao)
+
+    juridica = operacao.etapas.get(etapa=Etapa.JURIDICO)
+    decidir_etapa(juridica, aprovada=True, parecer="Termo confere.", usuario=crm)
     client.force_login(crm)
 
     resposta = client.get(reverse("operacoes:detalhe", args=[operacao.pk]))

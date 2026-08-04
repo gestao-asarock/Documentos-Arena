@@ -190,13 +190,20 @@ sem integração com a Genial e sem tela de trabalho (§7, D8).
 
 Papéis são **Groups do Django** com permissões, nunca campo de texto solto.
 
-| Papel | Quem | Pode |
-|---|---|---|
-| `administrador` | ASA | tudo, incluindo gestão de usuários e da tabela de regras |
-| `crm` | ASA | criar operação, enquadrar, triagem de documentos (etapa 1), registrar boletagem |
-| `compliance` | ASA | due diligence, consulta Trillia, aprovar/reprovar (etapa 2) |
-| `juridico` | ASA | revisão de documentos e vigência, aprovação final (etapa 4) |
-| `clube` | Corinthians | criar operação, subir documentos da contraparte, upload para assinatura (etapa 5) |
+**Cada área tem função própria e tela própria** (D34). Não são variações de "quem pode
+aprovar": são etapas diferentes do processo, e o menu de cada usuário mostra só o que ele
+faz. Tela de outra área responde **403**, não some apenas do menu.
+
+| Papel | Quem | Faz | Telas |
+|---|---|---|---|
+| `administrador` | ASA | tudo, mais gestão de usuários e da tabela de regras | todas |
+| `crm` | ASA | **triagem** dos documentos e **análise de crédito** (Serasa); registra boletagem | Triagem, Crédito |
+| `compliance` | ASA | **due diligence** das pessoas envolvidas; pode ajudar na triagem | Triagem, Due diligence |
+| `juridico` | ASA | **revisão dos contratos** — e só isso | Jurídico |
+| `clube` | Corinthians | **envia** perfis e documentos, reenvia o que for recusado, **acompanha** o fluxo; decide apenas a assinatura | Perfis, Contratos |
+
+O Clube **não interfere**: não aprova documento, não decide etapa de análise, não acessa
+fila de trabalho interna. Ele envia, corrige o que voltar e acompanha.
 
 **Risco/Crédito (etapa 3) não tem usuário próprio no MVP.** A etapa é criada normalmente
 quando o enquadramento exige, e funciona como **aprovação manual**: decisão
@@ -434,6 +441,16 @@ que está travado e por quê. Cada pendência aparece onde ocorreu, com o motivo
 
 E **toda checagem mostra quem a fez**: nome do usuário, data e hora, tanto da ASAROCK
 quanto do Clube. Login é individual — não existe conta compartilhada por área.
+
+**O dossiê do contrato** (`operacoes/dossie.py`) reúne, numa tela só, tudo que foi
+verificado: documentos do perfil, due diligence, crédito, documentos do contrato e as
+etapas decididas — cada item abrindo para o detalhe. É o que o Clube vê antes de assinar
+e o que sustenta a operação numa auditoria. O mesmo resumo aparece no perfil, ao lado de
+cada contrato.
+
+**O download só é liberado quando todas as etapas anteriores à assinatura passaram**
+(`pronto_para_assinatura`). A etapa de assinatura em si permanece pendente: é ela que o
+Clube cumpre ao baixar, assinar e devolver.
 
 ### 4.11 Entidades principais
 
@@ -695,6 +712,19 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   identificáveis são substituídos. **Nenhum documento real é enviado ao Gemini enquanto
   estivermos no free tier** (§5.1). Quem prepara e fornece essa massa é o responsável
   pelo projeto — não invente operações do nada nem presuma quais existem.
+- **D34 — Uma área, uma função, uma tela.** CRM: triagem + crédito, em filas separadas.
+  Compliance: due diligence (e triagem, se quiser ajudar) — **não faz crédito**, porque
+  são análises distintas. Jurídico: só revisão de contratos, com fila própria. Clube:
+  envia e acompanha (§4.2). O menu reflete isso, e as views recusam quem não é da área.
+- **D32 — DOCX aceito só nos documentos de contrato.** O Termo de Adesão vem em Word;
+  o kit cadastral continua PDF/JPG/PNG, porque ninguém tem RG em Word. A validação
+  confere o conteúdo: zip qualquer não passa por DOCX — precisa ter `word/document.xml`.
+- **D33 — Conversão DOCX → PDF com LibreOffice headless.** Instalado na imagem
+  (`libreoffice-writer`), é o padrão para conversão fiel e roda no EC2. Nenhuma
+  alternativa em Python puro preserva a formatação de um contrato. Quando o executável
+  não existe — Windows de desenvolvimento —, a conversão **falha com aviso**: nunca
+  entregue um `.docx` dizendo que é PDF. O resultado é guardado em
+  `ArquivoDocumento.pdf_convertido` e reaproveitado nos downloads seguintes.
 - **D31 — Contrato = modelo base + Termo de Adesão.** O modelo é fixo por tipo de
   operação; o termo, gerado pelo Clube, carrega os dados do caso. A análise jurídica do
   piloto confere se o termo reflete a operação (§4.9). O sistema **não gera** o termo.
@@ -704,12 +734,13 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   serve a **quantos contratos vierem**, enquanto os documentos estiverem vigentes.
   Documentos complementares exigidos por um enquadramento também ficam guardados no
   perfil e podem ser reaproveitados em contratos futuros do mesmo tipo.
-- **D30 — Crédito nasce no perfil e é ancorado depois.** A esteira do perfil é
+- **D30 — Existe uma análise de crédito, e ela é do perfil.** A esteira do perfil é
   documentos → conferência → due diligence → **crédito** → validado; sem crédito o perfil
-  não vira contrato. Essa primeira análise é **da pessoa** (score, restrições, protestos),
-  sem valor de referência. O **primeiro contrato** que a usar ancora o parecer no
-  enquadramento dele; daí em diante, contrato de outro tipo ou de outra faixa exige
-  análise nova, porque um parecer feito para R$ 2.000,00 não sustenta R$ 200.000,00.
+  não vira contrato. A análise é **da pessoa** (score, restrições, protestos), sem valor
+  de referência. **O contrato não a refaz**: a etapa 3 nasce como "cumprida na
+  habilitação", junto com triagem e due diligence. Se for preciso reavaliar — porque o
+  valor pulou de faixa, por exemplo —, isso é uma **revalidação do perfil**, não uma
+  etapa do contrato. Ao contrato restam a revisão jurídica e a assinatura.
 - **D28 — Documento nunca é URL pública.** Download passa por view autenticada, com
   checagem de permissão e registro na auditoria; no S3, redireciona para URL assinada de
   curta duração. Nome no disco é UUID (§5.4).

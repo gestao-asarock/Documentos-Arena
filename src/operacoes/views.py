@@ -6,15 +6,23 @@ Toda listagem passa por `operacoes_visiveis_para` — nunca consulte `Operacao`
 diretamente numa view, ou o filtro por papel se perde.
 """
 
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.base import ContentFile
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
+from integracoes.conversao import ConversaoIndisponivel, converter_docx_em_pdf
 
 from .conferencia import campos_do_contrato
+from .dossie import montar as montar_dossie
+from .dossie import pronto_para_assinatura
 from .estados import Etapa, TransicaoInvalida
 from .forms import (
     DecisaoEtapaForm,
@@ -32,6 +40,7 @@ from .servicos import (
     decidir_etapa,
     enquadrar,
     operacoes_visiveis_para,
+    registrar_download_para_assinatura,
 )
 
 
@@ -52,12 +61,22 @@ def detalhe(request, pk: int):
     operacao = get_object_or_404(
         operacoes_visiveis_para(request.user).prefetch_related("etapas"), pk=pk
     )
+    # Reaplica as regras antes de mostrar: registros parados durante uma mudança
+    # de regra ficariam com o status antigo, contradizendo o resto da tela.
+    if not operacao.esta_encerrada:
+        avancar(operacao)
+        operacao.refresh_from_db()
+
     etapa_atual = operacao.etapa_atual
     form_envio = EnvioDocumentoContratoForm(operacao=operacao)
 
     # A revisão jurídica do piloto é conferência de campos: o Termo de Adesão
     # precisa repetir o que foi registrado aqui (AGENTS.md §4.9).
     na_revisao_juridica = bool(etapa_atual) and etapa_atual.etapa == Etapa.JURIDICO
+
+    # A etapa 5 não se decide por parecer: ela se cumpre baixando o contrato. A
+    # tela manda o responsável para o download em vez de oferecer aprovar/reprovar.
+    na_assinatura = bool(etapa_atual) and etapa_atual.etapa == Etapa.ASSINATURAS
 
     return render(
         request,
@@ -68,8 +87,15 @@ def detalhe(request, pk: int):
             "etapa_atual": etapa_atual,
             # Documentação incompleta trava todas as etapas: o fluxo é linear.
             "documentacao_completa": operacao.documentacao_completa,
+            "na_assinatura": na_assinatura,
+            "pode_baixar_contrato": (
+                na_assinatura
+                and pode_decidir(request.user, etapa_atual)
+                and pronto_para_assinatura(operacao)
+            ),
             "pode_decidir": (
                 bool(etapa_atual)
+                and not na_assinatura
                 and operacao.documentacao_completa
                 and pode_decidir(request.user, etapa_atual)
             ),
@@ -78,7 +104,10 @@ def detalhe(request, pk: int):
             "conferencia": campos_do_contrato(operacao) if na_revisao_juridica else None,
             "documentos_exigidos": operacao.documentos_exigidos(),
             "documentos_pendentes": operacao.documentos_pendentes(),
-            "documentos_vinculados": operacao.documentos.select_related("tipo", "subtipo"),
+            # Separa "falta enviar" de "enviado, aguardando conferência": o mesmo
+            # documento aparecia nos dois lugares e parecia ser dois.
+            "situacao": operacao.situacao_documental(),
+            "tipos_a_enviar": operacao.tipos_a_enviar(),
             "form_documentos": VincularDocumentosForm(operacao=operacao),
             "form_envio": form_envio,
             "config_campos": {
@@ -150,6 +179,83 @@ def vincular_documentos(request, pk: int):
         messages.success(request, "Documentos vinculados ao contrato.")
 
     return redirect("operacoes:detalhe", pk=pk)
+
+
+@login_required
+def assinatura(request, pk: int):
+    """Dossiê de checagens e download do contrato pronto (AGENTS.md §4.10, D33)."""
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+
+    return render(
+        request,
+        "operacoes/assinatura.html",
+        {
+            "operacao": operacao,
+            "checagens": montar_dossie(operacao),
+            "liberado": pronto_para_assinatura(operacao),
+            # Quando já houve download, a etapa guarda quem baixou e quando.
+            "etapa_assinatura": next(
+                (e for e in operacao.etapas.all() if e.etapa == Etapa.ASSINATURAS), None
+            ),
+            "documentos": operacao.documentos.select_related("tipo", "subtipo").prefetch_related(
+                "arquivos"
+            ),
+        },
+    )
+
+
+@login_required
+def baixar_para_assinatura(request, pk: int, arquivo_id: int):
+    """Entrega o contrato em PDF, convertendo o DOCX quando necessário.
+
+    A conversão acontece uma vez e fica guardada: o Clube baixa sempre o mesmo
+    arquivo, e a auditoria registra cada download.
+    """
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+    if not pronto_para_assinatura(operacao):
+        messages.error(request, "O contrato ainda não passou por todas as checagens.")
+        return redirect("operacoes:assinatura", pk=pk)
+
+    arquivo = get_object_or_404(
+        ArquivoDocumento.objects.filter(documento__operacoes=operacao), pk=arquivo_id
+    )
+
+    if arquivo.precisa_converter:
+        try:
+            pdf = converter_docx_em_pdf(
+                arquivo.arquivo.read(), nome=arquivo.nome_original or "termo.docx"
+            )
+        except ConversaoIndisponivel as erro:
+            messages.error(request, str(erro))
+            return redirect("operacoes:assinatura", pk=pk)
+
+        nome = Path(arquivo.nome_original or "termo").stem + ".pdf"
+        arquivo.pdf_convertido.save(nome, ContentFile(pdf), save=True)
+
+    entrega = arquivo.arquivo_para_assinatura
+    registrar(
+        acao=Acao.DOWNLOAD,
+        descricao=f"Contrato #{operacao.pk} baixado para assinatura",
+        objeto=operacao,
+        usuario=request.user,
+    )
+
+    # Baixar é o ato que cumpre a etapa 5: quem baixou e quando ficam guardados
+    # e aparecem na tela da operação.
+    if registrar_download_para_assinatura(operacao, usuario=request.user):
+        messages.success(
+            request,
+            "Etapa de assinatura registrada: o contrato foi baixado para coleta de assinaturas.",
+        )
+
+    if settings.ARMAZENAMENTO == "s3":
+        return redirect(entrega.url)
+
+    return FileResponse(
+        entrega.open("rb"),
+        as_attachment=True,
+        filename=Path(entrega.name).name,
+    )
 
 
 @login_required

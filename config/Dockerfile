@@ -10,8 +10,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# libreoffice-writer converte o Termo de Adesão (DOCX) em PDF para a assinatura
+# (AGENTS.md D33). Só o Writer: o pacote completo é bem maior e não é preciso.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && apt-get install -y --no-install-recommends \
+        build-essential libpq-dev libreoffice-writer fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # A imagem de produção não leva pytest nem ruff. O Compose de desenvolvimento

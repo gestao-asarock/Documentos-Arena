@@ -66,7 +66,7 @@ def _enviar_e_aprovar(client, contrato, crm):
 
 def test_nao_decide_etapa_com_documentacao_incompleta(contrato, crm):
     """Aprovar revisão jurídica sem o contrato enviado não faz sentido."""
-    etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
+    etapa = contrato.etapas.get(etapa=Etapa.JURIDICO)
 
     with pytest.raises(TransicaoInvalida, match="Documentação incompleta"):
         decidir_etapa(etapa, aprovada=True, parecer="Sem restrições.", usuario=crm)
@@ -76,7 +76,7 @@ def test_nao_decide_etapa_com_documentacao_incompleta(contrato, crm):
 
 
 def test_erro_diz_qual_documento_falta(contrato, crm):
-    etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
+    etapa = contrato.etapas.get(etapa=Etapa.JURIDICO)
 
     with pytest.raises(TransicaoInvalida, match="Contrato entre o Fundo e o Cessionário"):
         decidir_etapa(etapa, aprovada=True, parecer="Sem restrições.", usuario=crm)
@@ -85,7 +85,7 @@ def test_erro_diz_qual_documento_falta(contrato, crm):
 def test_decide_normalmente_depois_dos_documentos(client, contrato, crm):
     _enviar_e_aprovar(client, contrato, crm)
 
-    etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
+    etapa = contrato.etapas.get(etapa=Etapa.JURIDICO)
     decidir_etapa(etapa, aprovada=True, parecer="Sem restrições.", usuario=crm)
     etapa.refresh_from_db()
 
@@ -99,7 +99,7 @@ def test_tela_nao_oferece_decisao_sem_documentos(client, contrato, crm):
 
     assert resposta.context["documentacao_completa"] is False
     assert resposta.context["pode_decidir"] is False
-    assert "O fluxo está parado na documentação" in resposta.content.decode()
+    assert "O fluxo está parado: faltam documentos" in resposta.content.decode()
 
 
 def test_tela_avisa_o_que_falta_no_topo(client, contrato, crm):
@@ -113,7 +113,7 @@ def test_tela_avisa_o_que_falta_no_topo(client, contrato, crm):
 
 def test_post_direto_tambem_e_barrado(client, contrato, crm):
     """Esconder o botão não é controle: a view recusa o POST."""
-    etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
+    etapa = contrato.etapas.get(etapa=Etapa.JURIDICO)
     client.force_login(crm)
 
     client.post(

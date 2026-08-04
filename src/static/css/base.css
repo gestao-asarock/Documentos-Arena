@@ -330,6 +330,31 @@ a { color: var(--cor-primaria); }
 .fluxo__item--futura .fluxo__marca { color: var(--cor-neutro); }
 
 .motivo { display: block; color: var(--cor-erro); font-size: var(--texto-pequeno); }
+
+/* Dossiê de checagens: fechado por padrão, aberto quando se quer o detalhe. */
+.checagem {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  margin-bottom: var(--esp-2);
+  background: var(--cor-superficie);
+}
+.checagem summary {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-3);
+  padding: var(--esp-3);
+  cursor: pointer;
+}
+.checagem summary::-webkit-details-marker { display: none; }
+.checagem summary:hover { background: var(--cor-selecao); }
+.checagem__corpo {
+  padding: 0 var(--esp-4) var(--esp-3) calc(var(--esp-3) + 110px);
+  color: var(--cor-texto-suave);
+}
+.checagem__corpo ul { margin: var(--esp-2) 0 0; padding-left: var(--esp-4); }
+.checagem--pendente { opacity: 0.8; }
+.checagem--externa { opacity: 0.6; }
+.checagem--atencao { border-color: var(--cor-atencao); }
 .acao-inline { display: inline; }
 .tabela__acoes { text-align: right; white-space: nowrap; }
 .lista-kit__nome { flex: 1; }

@@ -13,7 +13,7 @@ from django.urls import reverse
 from analise.servicos import aprovar_documento
 from contas.models import Papel, Usuario
 from contrapartes.models import DocumentoCadastral
-from operacoes.estados import Etapa, StatusEtapa, StatusOperacao
+from operacoes.estados import Etapa, StatusOperacao
 from operacoes.servicos import enquadrar
 
 pytestmark = pytest.mark.django_db
@@ -76,8 +76,8 @@ def test_contrato_nasce_aguardando_os_documentos_do_enquadramento(criar_contrato
     assert operacao.status == StatusOperacao.AGUARDANDO_DOCUMENTOS
 
 
-def test_documentacao_completa_leva_o_contrato_ao_credito(client, criar_contrato, crm):
-    """Sem isto o contrato ficava parado e nunca chegava à fila de crédito."""
+def test_documentacao_completa_leva_o_contrato_ao_juridico(client, criar_contrato, crm):
+    """Sem isto o contrato ficava parado e nunca chegava à revisão jurídica."""
     operacao = criar_contrato("2000.00")
     tipo = operacao.documentos_pendentes()[0]
     client.force_login(crm)
@@ -88,8 +88,8 @@ def test_documentacao_completa_leva_o_contrato_ao_credito(client, criar_contrato
 
     operacao.refresh_from_db()
     assert operacao.documentacao_completa
-    assert operacao.status == StatusOperacao.EM_CREDITO
-    assert operacao.etapa_atual.etapa == Etapa.RISCO_CREDITO
+    assert operacao.status == StatusOperacao.EM_APROVACAO
+    assert operacao.etapa_atual.etapa == Etapa.JURIDICO
 
 
 def test_documento_do_contrato_fica_no_perfil(client, criar_contrato, crm):
@@ -136,33 +136,4 @@ def test_vincular_documento_ja_validado(client, criar_contrato, crm):
     segundo.refresh_from_db()
 
     assert segundo.documentacao_completa
-    assert segundo.status == StatusOperacao.EM_CREDITO
-
-
-def test_credito_reaproveitado_pula_direto_para_o_juridico(client, criar_contrato, crm):
-    """Com crédito já dado no mesmo enquadramento, resta o jurídico (D30)."""
-    from credito.models import Veredito
-    from credito.servicos import concluir_parecer, obter_ou_criar_parecer
-
-    primeiro = criar_contrato("2000.00")
-    tipo = primeiro.documentos_pendentes()[0]
-    client.force_login(crm)
-    _enviar(client, primeiro, tipo)
-    documento = DocumentoCadastral.objects.get(tipo=tipo)
-    aprovar_documento(documento, usuario=crm)
-    primeiro.refresh_from_db()
-
-    parecer = obter_ou_criar_parecer(primeiro, usuario=crm)
-    parecer.veredito = Veredito.BAIXO
-    parecer.justificativa = "Sem restrições."
-    concluir_parecer(parecer, primeiro, usuario=crm)
-
-    segundo = criar_contrato("3000.00")
-    segundo.documentos.add(documento)
-    from operacoes.servicos import avancar
-
-    avancar(segundo)
-
-    etapa_credito = segundo.etapas.get(etapa=Etapa.RISCO_CREDITO)
-    assert etapa_credito.status == StatusEtapa.CUMPRIDA_NA_HABILITACAO
-    assert segundo.etapa_atual.etapa == Etapa.JURIDICO
+    assert segundo.status == StatusOperacao.EM_APROVACAO

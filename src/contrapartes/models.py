@@ -384,6 +384,12 @@ class ArquivoDocumento(models.Model):
     nome_original = models.CharField(
         max_length=255, blank=True, help_text="Nome que o usuário enviou, só para exibição."
     )
+    pdf_convertido = models.FileField(
+        "PDF convertido",
+        upload_to=caminho_do_arquivo,
+        blank=True,
+        help_text="Versão em PDF de um DOCX, gerada para a assinatura (AGENTS.md D33).",
+    )
     ordem = models.PositiveSmallIntegerField(default=0)
     data_envio = models.DateTimeField(auto_now_add=True)
 
@@ -394,3 +400,18 @@ class ArquivoDocumento(models.Model):
 
     def __str__(self) -> str:
         return self.nome_original or self.arquivo.name
+
+    @property
+    def eh_docx(self) -> bool:
+        return self.arquivo.name.lower().endswith(".docx")
+
+    @property
+    def arquivo_para_assinatura(self):
+        """O que vai para o Clube assinar: PDF sempre que houver."""
+        if self.eh_docx and self.pdf_convertido:
+            return self.pdf_convertido
+        return self.arquivo
+
+    @property
+    def precisa_converter(self) -> bool:
+        return self.eh_docx and not self.pdf_convertido

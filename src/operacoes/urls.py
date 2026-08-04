@@ -12,4 +12,10 @@ urlpatterns = [
     path("operacoes/<int:pk>/cancelar/", views.cancelar, name="cancelar"),
     path("operacoes/<int:pk>/documentos/", views.vincular_documentos, name="vincular_documentos"),
     path("operacoes/<int:pk>/documentos/enviar/", views.enviar_documento, name="enviar_documento"),
+    path("operacoes/<int:pk>/assinatura/", views.assinatura, name="assinatura"),
+    path(
+        "operacoes/<int:pk>/assinatura/<int:arquivo_id>/",
+        views.baixar_para_assinatura,
+        name="baixar_para_assinatura",
+    ),
 ]

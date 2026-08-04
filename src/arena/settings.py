@@ -53,6 +53,7 @@ APPS_LOCAIS = [
     "analise",
     "compliance",
     "credito",
+    "juridico",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + TERCEIROS + APPS_LOCAIS

@@ -14,8 +14,8 @@ from contas.models import Papel
 from contrapartes.models import DocumentoCadastral, StatusHabilitacao
 from documentos.models import StatusDocumento
 
-#: Quem confere documento. O guia atribui a triagem ao CRM; Compliance participa
-#: porque é quem sofre a consequência de documento mal conferido.
+#: A triagem é do CRM, conforme o guia. O Compliance pode conferir também — é
+#: quem sofre a consequência de documento mal triado (AGENTS.md D34).
 PAPEIS_QUE_CONFEREM = {Papel.CRM, Papel.COMPLIANCE, Papel.ADMINISTRADOR}
 
 
@@ -95,6 +95,8 @@ def rejeitar_documento(documento: DocumentoCadastral, *, usuario, motivo: str):
         objeto=documento,
         usuario=usuario,
     )
+    # Também na rejeição: o contrato volta a esperar envio, não fica "em análise".
+    _reavaliar_contratos(documento)
 
     perfil = _perfil_de(documento)
     habilitacao = perfil.habilitacao if perfil else None

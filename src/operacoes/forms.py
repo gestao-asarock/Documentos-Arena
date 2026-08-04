@@ -4,7 +4,7 @@ from django import forms
 
 from contrapartes.models import Contraparte, StatusHabilitacao
 from documentos.models import SubtipoDocumento, TipoDocumento
-from documentos.validadores import ACCEPT_HTML, validar_documento
+from documentos.validadores import ACCEPT_HTML_COM_DOCX, validar_documento
 from solicitacoes.campos import DataBRField, MultiploArquivoField
 
 from .models import TipoOperacao
@@ -94,11 +94,14 @@ class EnvioDocumentoContratoForm(forms.Form):
 
     def __init__(self, *args, operacao=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["arquivos"].widget.attrs["accept"] = ACCEPT_HTML
+        # Documento de contrato aceita DOCX: o Termo de Adesão vem em Word (D32).
+        self.fields["arquivos"].widget.attrs["accept"] = ACCEPT_HTML_COM_DOCX
+        self.fields["arquivos"].help_text = "PDF, JPG, PNG ou DOCX, até 25 MB cada."
         if operacao is None:
             return
 
-        pendentes = operacao.documentos_pendentes()
+        # Só o que ainda precisa de envio — não o que já está em conferência.
+        pendentes = operacao.tipos_a_enviar()
         ids = [tipo.id for tipo in pendentes]
         self.fields["tipo"].queryset = TipoDocumento.objects.filter(id__in=ids)
         self.fields["subtipo"].queryset = SubtipoDocumento.objects.filter(
@@ -115,7 +118,7 @@ class EnvioDocumentoContratoForm(forms.Form):
     def clean_arquivos(self) -> list:
         arquivos = self.cleaned_data["arquivos"]
         for arquivo in arquivos:
-            validar_documento(arquivo)
+            validar_documento(arquivo, aceitar_docx=True)
         return arquivos
 
     def clean(self):
@@ -143,7 +146,8 @@ class VincularDocumentosForm(forms.Form):
         if operacao is None:
             return
 
-        exigidos = operacao.documentos_exigidos()
+        # Só oferece reaproveitamento para o que ainda falta.
+        exigidos = operacao.tipos_a_enviar()
         disponiveis = operacao.contraparte.documentos_validos_de(exigidos)
         vinculados = {d.id for d in operacao.documentos.all()}
 

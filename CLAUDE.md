@@ -174,8 +174,7 @@ como pronta para contrato — fim da Fase 1.
 **Perfil × contrato separados** (AGENTS.md D29, D30): `Solicitacao` virou o **perfil** da
 contraparte (só documentos base, sem valor nem evento); `Operacao` carrega tipo, descrição,
 data, horário e valor, mais os documentos complementares escolhidos do perfil. Crédito
-continua na esteira do perfil (análise da pessoa) e é **ancorado** no enquadramento do
-primeiro contrato que o usar — outro tipo ou outra faixa pedem análise nova.
+acontece **uma vez, na esteira do perfil**; o contrato não a refaz (AGENTS.md D30).
 
 > **Dívida conhecida:** o app ainda se chama `solicitacoes`, mas hospeda os **perfis**.
 > Renomear para `perfis` quando houver um momento tranquilo — mexe em migrations.

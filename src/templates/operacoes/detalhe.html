@@ -28,19 +28,32 @@
 
   <p class="descricao">{{ operacao.descricao }}</p>
 
-  {% if documentos_pendentes and not operacao.esta_encerrada %}
-    <p class="aviso aviso--atencao">
-      &#9888; <strong>Falta{{ documentos_pendentes|length|pluralize:",m" }}
-      {{ documentos_pendentes|length }} documento{{ documentos_pendentes|length|pluralize:",s" }}</strong>
-      para o contrato seguir:
-      {% for tipo in documentos_pendentes %}{{ tipo.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}.
-      <a href="#documentacao">Enviar agora</a>.
-    </p>
+  {% if not operacao.esta_encerrada %}
+    {% if situacao.faltando %}
+      <p class="aviso aviso--atencao">
+        &#9888; <strong>Falta{{ situacao.faltando|length|pluralize:",m" }} enviar
+        {{ situacao.faltando|length }} documento{{ situacao.faltando|length|pluralize:",s" }}</strong>
+        para o contrato seguir:
+        {% for tipo in situacao.faltando %}{{ tipo.nome }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+        <a href="#documentacao">Enviar agora</a>.
+      </p>
+    {% elif situacao.em_analise %}
+      <p class="aviso aviso--info">
+        &#9679; Documentação do contrato enviada, <strong>aguardando conferência</strong>.
+        O contrato segue assim que for aprovada.
+      </p>
+    {% endif %}
   {% endif %}
 
   {% if operacao.motivo_reprovacao %}
     <p class="aviso aviso--erro"><strong>Motivo da reprovação:</strong> {{ operacao.motivo_reprovacao }}</p>
   {% endif %}
+
+  <p>
+    <a class="botao botao--discreto" href="{% url 'operacoes:assinatura' operacao.pk %}">
+      Ver checagens e contrato para assinatura
+    </a>
+  </p>
 </section>
 
 <section class="cartao">
@@ -48,7 +61,7 @@
   {% if etapas %}
     <table class="tabela">
       <thead>
-        <tr><th>Etapa</th><th>Responsável</th><th>Situação</th><th>Decidida por</th><th>Parecer</th></tr>
+        <tr><th>Etapa</th><th>Responsável</th><th>Situação</th><th>Decidida por</th><th>Quando</th><th>Parecer</th></tr>
       </thead>
       <tbody>
         {% for etapa in etapas %}
@@ -57,6 +70,7 @@
             <td>{{ etapa.papel_responsavel }}</td>
             <td>{% include "operacoes/_situacao.html" with status=etapa.status rotulo=etapa.get_status_display %}</td>
             <td>{{ etapa.decidida_por|default:"—" }}</td>
+            <td>{{ etapa.data_decisao|data_hora_br }}</td>
             <td>{{ etapa.parecer|default:"—" }}</td>
           </tr>
         {% endfor %}
@@ -71,9 +85,13 @@
       <h3 class="subtitulo">Decidir: {{ etapa_atual.get_etapa_display }}</h3>
       {% if not documentacao_completa %}
         <p class="aviso aviso--atencao">
-          &#9888; O fluxo está parado na documentação: nada é decidido antes de os
-          documentos serem enviados e aprovados.
-          <a href="#documentacao">Ver o que falta</a>.
+          {% if situacao.em_analise and not situacao.faltando %}
+            &#9679; Documento do contrato enviado, <strong>aguardando conferência</strong>.
+            Assim que for aprovado, o contrato segue para esta etapa.
+          {% else %}
+            &#9888; O fluxo está parado: faltam documentos do contrato.
+          {% endif %}
+          <a href="#documentacao">Ver a situação</a>.
         </p>
       {% elif conferencia %}
         <p class="ajuda">
@@ -104,7 +122,26 @@
         </p>
       {% endif %}
 
-      {% if pode_decidir %}
+      {% if na_assinatura %}
+        <p class="ajuda">
+          Esta etapa não se aprova por parecer: ela se cumpre <strong>baixando o
+          contrato</strong> para coleta das assinaturas. O download registra quem
+          baixou e quando, e conclui a etapa.
+        </p>
+        {% if pode_baixar_contrato %}
+          <p>
+            <a class="botao botao--grande" href="{% url 'operacoes:assinatura' operacao.pk %}">
+              Baixar contrato para assinatura
+            </a>
+          </p>
+        {% else %}
+          <p class="vazio">
+            Etapa sob responsabilidade de <strong>{{ etapa_atual.papel_responsavel }}</strong>,
+            que baixa o contrato para assinatura.
+            <a href="{% url 'operacoes:assinatura' operacao.pk %}">Ver checagens</a>.
+          </p>
+        {% endif %}
+      {% elif pode_decidir %}
         <form method="post" action="{% url 'operacoes:decidir' operacao.pk etapa_atual.pk %}" class="formulario">
           {% csrf_token %}
           <label for="{{ form_decisao.parecer.id_for_label }}">{{ form_decisao.parecer.label }}</label>
@@ -133,29 +170,69 @@
     este contrato exige a mais — e que fica guardado no perfil para os próximos.
   </p>
 
-  {% if documentos_vinculados %}
-    <h3 class="subtitulo">Vinculados a este contrato</h3>
+  {% if situacao.aprovados %}
+    <h3 class="subtitulo">Aprovados</h3>
     <ul class="lista-kit">
-      {% for documento in documentos_vinculados %}
+      {% for documento in situacao.aprovados %}
         <li class="lista-kit__item">
-          {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
-          <span class="lista-kit__nome">{{ documento.rotulo }}</span>
+          <span class="estado estado--sucesso">&#10003; Aprovado</span>
+          <span class="lista-kit__nome">
+            {{ documento.rotulo }}
+            {% if documento.subtipo %}<small class="ajuda">{{ documento.tipo }}</small>{% endif %}
+          </span>
         </li>
       {% endfor %}
     </ul>
   {% endif %}
 
-  {% if documentos_pendentes %}
-    <h3 class="subtitulo">Faltando</h3>
+  {% if situacao.em_analise %}
+    <h3 class="subtitulo">Aguardando conferência</h3>
     <ul class="lista-kit">
-      {% for tipo in documentos_pendentes %}
+      {% for documento in situacao.em_analise %}
+        <li class="lista-kit__item">
+          {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+          <span class="lista-kit__nome">
+            {{ documento.rotulo }}
+            {% if documento.subtipo %}<small class="ajuda">atende: {{ documento.tipo }}</small>{% endif %}
+            {% if documento.observacao %}<small class="motivo">{{ documento.observacao }}</small>{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+    <p class="ajuda">
+      Já enviado — falta a conferência documental. Enviar não é aprovar: o contrato só
+      avança depois da checagem.
+    </p>
+  {% endif %}
+
+  {% if situacao.com_problema %}
+    <h3 class="subtitulo">Precisa de correção</h3>
+    <ul class="lista-kit">
+      {% for documento in situacao.com_problema %}
+        <li class="lista-kit__item">
+          <span class="estado estado--erro">&#10007; {{ documento.get_status_display }}</span>
+          <span class="lista-kit__nome">
+            {{ documento.rotulo }}{% if documento.esta_vencido %} — vencido{% endif %}
+            {% if documento.observacao %}<small class="motivo">Motivo: {{ documento.observacao }}</small>{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if situacao.faltando %}
+    <h3 class="subtitulo">Faltando enviar</h3>
+    <ul class="lista-kit">
+      {% for tipo in situacao.faltando %}
         <li class="lista-kit__item">
           <span class="estado estado--andamento">&#9675; Faltando</span>
           <span class="lista-kit__nome">{{ tipo.nome }}</span>
         </li>
       {% endfor %}
     </ul>
+  {% endif %}
 
+  {% if tipos_a_enviar %}
     {% if form_documentos.fields %}
       <form method="post" action="{% url 'operacoes:vincular_documentos' operacao.pk %}"
             class="formulario">
@@ -196,10 +273,10 @@
         </div>
       </form>
     </div>
-  {% elif documentos_exigidos %}
-    <p class="vazio">&#10003; Documentação do contrato completa.</p>
-  {% else %}
+  {% elif not documentos_exigidos %}
     <p class="vazio">Nenhuma exigência específica além do perfil.</p>
+  {% elif documentacao_completa %}
+    <p class="vazio">&#10003; Documentação do contrato completa e aprovada.</p>
   {% endif %}
 </section>
 

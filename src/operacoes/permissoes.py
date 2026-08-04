@@ -10,12 +10,18 @@ from contas.models import Papel
 from .estados import Etapa
 from .models import EtapaAprovacao
 
-#: Risco/Crédito não tem usuário próprio no MVP: CRM ou Compliance registra o
-#: parecer em nome do time (AGENTS.md D9).
+#: Cada área atua na sua etapa (AGENTS.md §4.2, D34):
+#:
+#:   crm         triagem documental e análise de crédito
+#:   compliance  due diligence — e triagem, se quiser ajudar
+#:   juridico    revisão dos contratos, e só
+#:   clube       envia e acompanha; decide apenas a assinatura
 PAPEIS_POR_ETAPA = {
-    Etapa.TRIAGEM: {Papel.CRM},
+    Etapa.TRIAGEM: {Papel.CRM, Papel.COMPLIANCE},
     Etapa.DUE_DILIGENCE: {Papel.COMPLIANCE},
-    Etapa.RISCO_CREDITO: {Papel.CRM, Papel.COMPLIANCE},
+    # Risco/Crédito não tem usuário próprio no MVP: o CRM registra o parecer em
+    # nome do time, consultando o Serasa (AGENTS.md D9).
+    Etapa.RISCO_CREDITO: {Papel.CRM},
     Etapa.JURIDICO: {Papel.JURIDICO},
     Etapa.ASSINATURAS: {Papel.CLUBE},
     Etapa.ENVIO_NF: {Papel.CLUBE},

@@ -13,7 +13,7 @@ from django.db import models
 from django.utils import timezone
 
 from contrapartes.models import Contraparte
-from documentos.models import EscopoDocumento, TipoDocumento
+from documentos.models import EscopoDocumento, StatusDocumento, TipoDocumento
 
 from .estados import (
     ESTADOS_QUE_NAO_CANCELAM,
@@ -335,9 +335,53 @@ class Operacao(models.Model):
         return exigidos
 
     def documentos_pendentes(self) -> list[TipoDocumento]:
-        """Exigências deste contrato ainda sem documento vigente vinculado."""
+        """Exigências ainda sem documento **aprovado e vigente**.
+
+        Inclui o que já foi enviado e aguarda conferência: enviar não é aprovar
+        (AGENTS.md §4.5). Para a tela, use `situacao_documental`, que separa o
+        que falta enviar do que está em análise.
+        """
         atendidos = {d.tipo_id for d in self.documentos.all() if d.esta_vigente}
         return [tipo for tipo in self.documentos_exigidos() if tipo.id not in atendidos]
+
+    def situacao_documental(self) -> dict[str, list]:
+        """As exigências em três grupos, para a tela não confundir os estados.
+
+        Um documento enviado e ainda não conferido aparecia como "faltando" —
+        e, como o subtipo tem outro nome, parecia um segundo documento.
+        """
+        por_tipo: dict[int, list] = {}
+        for documento in self.documentos.select_related("tipo", "subtipo"):
+            por_tipo.setdefault(documento.tipo_id, []).append(documento)
+
+        aprovados, em_analise, com_problema, faltando = [], [], [], []
+        recusados = {StatusDocumento.REJEITADO, StatusDocumento.FALHA_ANALISE}
+
+        for tipo in self.documentos_exigidos():
+            documentos = por_tipo.get(tipo.id, [])
+            if not documentos:
+                faltando.append(tipo)
+            elif any(d.esta_vigente for d in documentos):
+                aprovados.extend(d for d in documentos if d.esta_vigente)
+            elif any(d.status in recusados or d.esta_vencido for d in documentos):
+                # Rejeitado ou vencido é problema a corrigir, não algo em curso.
+                com_problema.extend(documentos)
+            else:
+                em_analise.extend(documentos)
+
+        return {
+            "aprovados": aprovados,
+            "em_analise": em_analise,
+            "com_problema": com_problema,
+            "faltando": faltando,
+        }
+
+    def tipos_a_enviar(self) -> list[TipoDocumento]:
+        """O que ainda precisa de envio: nada vinculado, ou o que foi recusado."""
+        situacao = self.situacao_documental()
+        tipos = list(situacao["faltando"])
+        tipos.extend(documento.tipo for documento in situacao["com_problema"])
+        return tipos
 
     @property
     def documentacao_completa(self) -> bool:

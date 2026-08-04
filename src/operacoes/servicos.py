@@ -61,16 +61,13 @@ class ContraparteNaoHabilitada(Exception):
     """A Fase 2 só começa com a contraparte habilitada e a habilitação vigente."""
 
 
-def _status_inicial_da_etapa(etapa: Etapa, operacao: Operacao) -> str:
+def _status_inicial_da_etapa(etapa: Etapa) -> str:
     """Como cada etapa nasce num contrato.
 
-    Triagem e due diligence vieram do perfil; as três últimas acontecem na
-    Genial. O crédito depende do valor: reaproveita o parecer se já houver um
-    vigente para este mesmo enquadramento (AGENTS.md D30).
+    Triagem, due diligence e crédito vieram do perfil; as três últimas acontecem
+    na Genial. Ao contrato restam a revisão jurídica e a assinatura.
     """
     if etapa in ETAPAS_DA_HABILITACAO:
-        return StatusEtapa.CUMPRIDA_NA_HABILITACAO
-    if etapa == Etapa.RISCO_CREDITO and _parecer_de_credito_vigente(operacao):
         return StatusEtapa.CUMPRIDA_NA_HABILITACAO
     if etapa in ETAPAS_NO_ESCOPO:
         return StatusEtapa.PENDENTE
@@ -127,11 +124,10 @@ def _parecer_da_habilitacao(etapa: Etapa, habilitacao, operacao: Operacao) -> st
     if etapa == Etapa.RISCO_CREDITO:
         parecer = _parecer_de_credito_vigente(operacao)
         if parecer is None:
-            return ""
-        origem = parecer.regra.criterio if parecer.regra_id else "análise do perfil"
+            return f"Cumprida na validação do perfil #{habilitacao.pk}."
         return (
-            f"Crédito já analisado ({origem}) — "
-            f"{parecer.get_veredito_display()}: {parecer.justificativa}"
+            f"Perfil #{habilitacao.pk} — {parecer.get_veredito_display()}: "
+            f"{parecer.justificativa}"
         )
 
     return ""
@@ -177,7 +173,7 @@ def enquadrar(operacao: Operacao, *, usuario=None) -> Operacao:
             EtapaAprovacao(
                 operacao=operacao,
                 etapa=etapa,
-                status=_status_inicial_da_etapa(etapa, operacao),
+                status=_status_inicial_da_etapa(etapa),
                 parecer=_parecer_da_habilitacao(etapa, habilitacao, operacao),
             )
             for etapa in regra.etapas_exigidas()
@@ -247,6 +243,42 @@ def decidir_etapa(
     return etapa
 
 
+def registrar_download_para_assinatura(operacao: Operacao, *, usuario) -> EtapaAprovacao | None:
+    """Cumpre a etapa de assinatura no ato do download do contrato.
+
+    A etapa 5 é do Clube e não é um julgamento: não há o que aprovar ou reprovar
+    num contrato que já passou por todas as checagens. O que a marca como
+    cumprida é o Clube levar o PDF para assinar — então é o download que a
+    fecha, guardando quem baixou e quando.
+
+    Devolve a etapa cumprida, ou `None` quando não havia o que cumprir (contrato
+    sem etapa de assinatura, ou já baixado antes — rebaixar não reescreve a data
+    do primeiro download).
+    """
+    etapa = next(
+        (e for e in operacao.etapas.all() if e.etapa == Etapa.ASSINATURAS),
+        None,
+    )
+    if etapa is None or etapa.esta_decidida:
+        return None
+
+    etapa.status = StatusEtapa.APROVADA
+    etapa.decidida_por = usuario
+    etapa.data_decisao = timezone.now()
+    etapa.parecer = "Contrato baixado pelo Clube para coleta de assinaturas."
+    etapa.save()
+
+    registrar(
+        acao=Acao.APROVACAO,
+        descricao=f"{etapa.get_etapa_display()} da operação #{operacao.pk} cumprida por download",
+        objeto=operacao,
+        usuario=usuario,
+    )
+
+    avancar(operacao, etapa_decidida=Etapa.ASSINATURAS)
+    return etapa
+
+
 def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Operacao:
     """Leva a operação ao estado correspondente às etapas já decididas.
 
@@ -254,6 +286,11 @@ def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Opera
     estado é derivado do que resta pendente, nunca assumido (AGENTS.md §4.7).
     """
     if operacao.esta_encerrada:
+        return operacao
+
+    # Rascunho ainda não foi enquadrado: não tem etapas, e "nenhuma etapa
+    # pendente" aqui não significa concluído.
+    if operacao.esta_em_rascunho:
         return operacao
 
     # A assinatura é do Clube e acontece fora do nosso controle: o estado
@@ -275,13 +312,20 @@ def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Opera
         return operacao
 
     # A ordem importa: sem os documentos do contrato não há o que analisar, então
-    # a falta deles vem antes de qualquer etapa.
+    # a falta deles vem antes de qualquer etapa. E falta enviar é diferente de
+    # enviado esperando conferência — o estado precisa dizer qual dos dois é.
     if not operacao.documentacao_completa:
-        destino = StatusOperacao.AGUARDANDO_DOCUMENTOS
+        situacao = operacao.situacao_documental()
+        esperando_conferencia = (
+            situacao["em_analise"] and not situacao["faltando"] and not situacao["com_problema"]
+        )
+        destino = (
+            StatusOperacao.EM_ANALISE_DOCUMENTAL
+            if esperando_conferencia
+            else StatusOperacao.AGUARDANDO_DOCUMENTOS
+        )
     elif proxima.etapa == Etapa.ASSINATURAS:
         destino = StatusOperacao.AGUARDANDO_ASSINATURA
-    elif proxima.etapa == Etapa.RISCO_CREDITO:
-        destino = StatusOperacao.EM_CREDITO
     else:
         destino = StatusOperacao.EM_APROVACAO
 
@@ -314,5 +358,6 @@ __all__ = [
     "encontrar_regra",
     "enquadrar",
     "operacoes_visiveis_para",
+    "registrar_download_para_assinatura",
     "Etapa",
 ]

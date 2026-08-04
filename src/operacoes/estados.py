@@ -57,8 +57,10 @@ TRANSICOES = {
     StatusOperacao.EM_ANALISE_DOCUMENTAL: {
         StatusOperacao.EM_CREDITO,
         StatusOperacao.EM_APROVACAO,
+        # Documento rejeitado devolve o contrato para o envio.
         StatusOperacao.AGUARDANDO_DOCUMENTOS,
         StatusOperacao.AGUARDANDO_ASSINATURA,
+        StatusOperacao.CONCLUIDA,
     },
     StatusOperacao.EM_CREDITO: {
         StatusOperacao.EM_APROVACAO,
@@ -143,5 +145,10 @@ class StatusEtapa(models.TextChoices):
 
 #: Etapas resolvidas na validação do perfil — a operação as exibe como cumpridas,
 #: para o fluxo aparecer inteiro, mas não as executa de novo (AGENTS.md D29).
-#: Crédito ficou de fora: depende do valor, então é por contrato (D30).
-ETAPAS_DA_HABILITACAO = frozenset({Etapa.TRIAGEM, Etapa.DUE_DILIGENCE})
+#:
+#: Crédito está aqui: **existe uma análise de crédito e ela acontece na esteira
+#: do perfil** (D30). O contrato não a refaz; se for preciso reavaliar por
+#: mudança de faixa ou de tipo, isso é uma revalidação do perfil.
+ETAPAS_DA_HABILITACAO = frozenset(
+    {Etapa.TRIAGEM, Etapa.DUE_DILIGENCE, Etapa.RISCO_CREDITO}
+)

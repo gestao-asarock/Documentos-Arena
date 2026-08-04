@@ -12,7 +12,7 @@ from django.contrib.auth.models import Group
 
 from contas.models import Papel, Usuario
 from contrapartes.models import Contraparte, Habilitacao, StatusHabilitacao
-from credito.models import ParecerCredito, Veredito
+from credito.models import Veredito
 from credito.servicos import (
     ParecerIncompleto,
     concluir_parecer_do_perfil,
@@ -21,7 +21,7 @@ from credito.servicos import (
     recusar_perfil,
 )
 from operacoes.estados import Etapa, StatusEtapa
-from operacoes.models import Operacao, RegraEnquadramento, TipoOperacao
+from operacoes.models import Operacao, TipoOperacao
 from operacoes.servicos import enquadrar
 from solicitacoes.models import Solicitacao, StatusSolicitacao
 
@@ -79,6 +79,21 @@ def test_perfil_nao_e_validado_sem_credito(habilitacao):
     assert not habilitacao.contraparte.esta_habilitada
 
 
+def test_contrato_de_perfil_sem_parecer_ainda_assim_nao_pede_credito(habilitacao, crm):
+    """Perfis validados antes da mudança não reabrem crédito no contrato.
+
+    A etapa vem cumprida com a nota de que veio do perfil; se for preciso
+    reanalisar, isso é revalidação do perfil (AGENTS.md D30).
+    """
+    habilitacao.status = StatusHabilitacao.HABILITADA
+    habilitacao.save()
+
+    contrato = _contrato(habilitacao.contraparte, crm)
+    etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
+
+    assert etapa.status == StatusEtapa.CUMPRIDA_NA_HABILITACAO
+
+
 def test_parecer_do_perfil_nasce_sem_enquadramento(habilitacao, crm):
     parecer = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=crm)
 
@@ -103,70 +118,15 @@ def test_conclusao_valida_o_perfil(habilitacao, crm):
     assert perfil.status == StatusSolicitacao.PRONTA_PARA_CONTRATO
 
 
-def test_primeiro_contrato_aproveita_o_credito_do_perfil(habilitacao, crm):
-    """Não se refaz a análise logo em seguida (AGENTS.md D30)."""
+def test_contrato_aproveita_o_credito_do_perfil(habilitacao, crm):
+    """O contrato não refaz a análise: ela é do perfil (AGENTS.md D30)."""
     _concluir(habilitacao, crm)
 
     contrato = _contrato(habilitacao.contraparte, crm)
     etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
 
     assert etapa.status == StatusEtapa.CUMPRIDA_NA_HABILITACAO
-    assert "análise do perfil" in etapa.parecer
-
-
-def test_primeiro_contrato_ancora_o_parecer_no_enquadramento(habilitacao, crm):
-    """A partir daí, outro tipo ou outra faixa exigem análise nova."""
-    _concluir(habilitacao, crm)
-
-    contrato = _contrato(habilitacao.contraparte, crm)
-    parecer = ParecerCredito.objects.get(contraparte=habilitacao.contraparte)
-
-    assert parecer.regra == contrato.regra
-    assert parecer.operacao == contrato
-
-
-def test_contrato_de_outro_enquadramento_exige_nova_analise(habilitacao, crm):
-    _concluir(habilitacao, crm)
-    _contrato(habilitacao.contraparte, crm)
-
-    # Enquadramento diferente: outro tipo de operação com regra própria.
-    outro_tipo = TipoOperacao.objects.create(nome="Serviços NQA")
-    RegraEnquadramento.objects.create(
-        tipo_operacao=outro_tipo,
-        criterio="Prestadores até R$ 5.000,00/mês",
-        valor_minimo=Decimal("0.01"),
-        valor_maximo=Decimal("5000.00"),
-        exige_risco_credito=True,
-        implementada=True,
-    )
-    outro = Operacao.objects.create(
-        contraparte=habilitacao.contraparte,
-        tipo_operacao=outro_tipo,
-        descricao="Serviço de manutenção",
-        valor_total=Decimal("1500.00"),
-        criada_por=crm,
-    )
-    enquadrar(outro, usuario=crm)
-
-    etapa = outro.etapas.get(etapa=Etapa.RISCO_CREDITO)
-    assert etapa.status == StatusEtapa.PENDENTE
-
-
-def test_perfil_validado_sem_parecer_cai_na_fila_do_contrato(habilitacao, crm):
-    """Perfis validados antes de o crédito entrar na esteira não têm parecer.
-
-    O contrato então pede a análise em vez de presumir que ela existiu — é o que
-    acontece com os cadastros anteriores à mudança (AGENTS.md D30).
-    """
-    habilitacao.status = StatusHabilitacao.HABILITADA
-    habilitacao.save()
-    assert not ParecerCredito.objects.filter(contraparte=habilitacao.contraparte).exists()
-
-    contrato = _contrato(habilitacao.contraparte, crm)
-    etapa = contrato.etapas.get(etapa=Etapa.RISCO_CREDITO)
-
-    assert etapa.status == StatusEtapa.PENDENTE
-    assert contrato.status.startswith("aguardando") or contrato.status == "em_credito"
+    assert "Risco baixo" in etapa.parecer
 
 
 def test_recusa_no_credito_barra_o_perfil(habilitacao, crm):
