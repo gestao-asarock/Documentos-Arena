@@ -282,7 +282,11 @@ acontece **uma vez, na esteira do perfil**; o contrato não a refaz (AGENTS.md D
 > **Dívida conhecida:** o app ainda se chama `solicitacoes`, mas hospeda os **perfis**.
 > Renomear para `perfis` quando houver um momento tranquilo — mexe em migrations.
 
-**Dossiê da tela de assinatura** (`operacoes/dossie.py`): os relatórios de compliance e de
+**Dossiê da tela de assinatura** (`operacoes/dossie.py`): a tela lista os **documentos
+enviados pelo Clube** em duas seções — os deste contrato e o **kit cadastral do perfil** —,
+baixáveis como foram enviados (`operacoes:baixar_documento`) — leitura
+que **não cumpre a etapa 5**, ao contrário de `baixar_para_assinatura`, que converte o DOCX e
+registra quem levou o contrato (AGENTS.md D54). Os relatórios de compliance e de
 crédito são **baixáveis ali mesmo** (`operacoes:baixar_relatorio`, com a origem no caminho),
 e a justificativa de cada parecer aparece como texto. O acesso é governado pela visibilidade
 do **contrato**, não pelo papel da área: quem assina precisa poder ler o que sustenta a

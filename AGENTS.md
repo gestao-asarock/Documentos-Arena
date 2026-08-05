@@ -801,6 +801,18 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   (`-`). Docstring e comentário ficam de fora: são texto para quem lê o código.
   `tests/test_templates.py` varre os templates e, pelo `ast`, as strings do Python que não
   são docstring — o que passa a valer também para o código que ainda não existe.
+- **D54 — Ler o documento e levá-lo para assinar são downloads diferentes.** Decisão de
+  05/08/2026. A tela de assinatura passou a listar os **documentos enviados pelo Clube**,
+  baixáveis como foram enviados (`operacoes:baixar_documento`). Esse caminho é de leitura e
+  **não cumpre etapa alguma**; quem cumpre a etapa 5 continua sendo `baixar_para_assinatura`,
+  que converte o DOCX em PDF e registra quem levou o contrato e quando (D33). Manter os dois
+  no mesmo botão obrigava a cumprir a etapa só para conferir o que estava sendo assinado.
+  A lista traz **duas seções**: os documentos deste contrato e o **kit cadastral do perfil**,
+  que é da contraparte e vale para os contratos seguintes (D29) — quem assina precisa poder
+  ver com quem está contratando, não só o termo. Por isso `baixar_documento` confere que o
+  arquivo é **da contraparte daquele contrato**, e não que pertence ao contrato;
+  `baixar_para_assinatura` continua restrito aos arquivos do contrato. Os dois vão para a
+  auditoria (§5.4, §6).
 - **D53 — Aprovar a revisão jurídica exige conferir todos os campos.** Decisão de
   05/08/2026. As caixas do "o que conferir" eram enfeite: não iam no formulário e ninguém
   as validava, então dava para aprovar sem olhar campo nenhum — e a tela ainda dizia que

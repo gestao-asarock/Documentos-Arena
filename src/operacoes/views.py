@@ -206,6 +206,14 @@ def assinatura(request, pk: int):
             "documentos": operacao.documentos.select_related("tipo", "subtipo").prefetch_related(
                 "arquivos"
             ),
+            # O kit cadastral é da contraparte, não deste contrato: entra numa
+            # lista à parte, para não parecer exigência da operação (D29, D54).
+            "documentos_do_perfil": (
+                operacao.contraparte.documentos_cadastrais.exclude(operacoes=operacao)
+                .select_related("tipo", "subtipo")
+                .prefetch_related("arquivos")
+                .order_by("tipo__nome")
+            ),
         },
     )
 
@@ -261,6 +269,47 @@ def baixar_para_assinatura(request, pk: int, arquivo_id: int):
         entrega.open("rb"),
         as_attachment=True,
         filename=Path(entrega.name).name,
+    )
+
+
+@login_required
+def baixar_documento(request, pk: int, arquivo_id: int):
+    """Entrega o documento **como o Clube enviou**, para leitura.
+
+    Diferente de `baixar_para_assinatura`, que converte o DOCX em PDF e **cumpre
+    a etapa 5**: este caminho é de conferência e não decide nada. Quem precisa
+    ler o que foi enviado antes de assinar não deveria ter de cumprir a etapa
+    para conseguir abrir o arquivo (AGENTS.md §4.10, D54).
+
+    Serve tanto os documentos do contrato quanto o kit cadastral: os dois são da
+    **contraparte** deste contrato, e é isso que a busca confere. Sem esse
+    filtro, trocar o id na URL leria documento de outra pessoa.
+    """
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+    arquivo = get_object_or_404(
+        ArquivoDocumento.objects.select_related("documento").filter(
+            documento__contraparte=operacao.contraparte
+        ),
+        pk=arquivo_id,
+    )
+
+    registrar(
+        acao=Acao.DOWNLOAD,
+        descricao=(
+            f"Arquivo #{arquivo.pk} de {arquivo.documento.rotulo} baixado no dossiê "
+            f"do contrato #{operacao.pk}"
+        ),
+        objeto=arquivo.documento,
+        usuario=request.user,
+    )
+
+    if settings.ARMAZENAMENTO == "s3":
+        return redirect(arquivo.arquivo.url)
+
+    return FileResponse(
+        arquivo.arquivo.open("rb"),
+        as_attachment=True,
+        filename=arquivo.nome_original or Path(arquivo.arquivo.name).name,
     )
 
 

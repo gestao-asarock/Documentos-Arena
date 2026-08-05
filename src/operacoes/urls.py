@@ -23,4 +23,9 @@ urlpatterns = [
         views.baixar_relatorio,
         name="baixar_relatorio",
     ),
+    path(
+        "operacoes/<int:pk>/documentos/<int:arquivo_id>/baixar/",
+        views.baixar_documento,
+        name="baixar_documento",
+    ),
 ]

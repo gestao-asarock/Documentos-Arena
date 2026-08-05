@@ -212,6 +212,88 @@ def test_relatorio_de_outra_contraparte_nao_vaza(
     assert resposta.status_code == 404
 
 
+def test_documentos_enviados_aparecem_na_tela_de_assinatura(client, contrato, crm):
+    """Quem vai assinar precisa poder ler o que o Clube mandou."""
+    documento = _enviar(contrato, crm)
+    arquivo = documento.arquivos.first()
+    client.force_login(crm)
+
+    corpo = client.get(reverse("operacoes:assinatura", args=[contrato.pk])).content.decode()
+
+    assert "Documentos enviados" in corpo
+    assert reverse("operacoes:baixar_documento", args=[contrato.pk, arquivo.pk]) in corpo
+
+
+def test_documento_do_contrato_e_baixavel_sem_cumprir_a_assinatura(client, contrato, crm):
+    """Ler o documento não é levá-lo para assinar: a etapa 5 não se cumpre aqui."""
+    documento = _enviar(contrato, crm)
+    arquivo = documento.arquivos.first()
+    client.force_login(crm)
+
+    resposta = client.get(reverse("operacoes:baixar_documento", args=[contrato.pk, arquivo.pk]))
+    etapa = contrato.etapas.get(etapa=Etapa.ASSINATURAS)
+
+    assert resposta.status_code == 200
+    assert b"".join(resposta.streaming_content) == PDF
+    assert etapa.data_decisao is None
+
+
+def _documento_do_kit(contraparte, crm):
+    """Documento cadastral do perfil, que não pertence a contrato algum (D29)."""
+    from documentos.models import TipoDocumento
+
+    documento = DocumentoCadastral.objects.create(
+        contraparte=contraparte,
+        tipo=TipoDocumento.objects.get(nome="Comprovante de endereço"),
+        enviado_por=crm,
+    )
+    ArquivoDocumento.objects.create(
+        documento=documento,
+        arquivo=SimpleUploadedFile("conta-de-luz.pdf", PDF),
+        nome_original="conta-de-luz.pdf",
+    )
+    return documento
+
+
+def test_kit_cadastral_aparece_e_e_baixavel(client, contrato, crm):
+    """Quem assina precisa poder ver quem é a contraparte, não só o termo."""
+    documento = _documento_do_kit(contrato.contraparte, crm)
+    arquivo = documento.arquivos.first()
+    client.force_login(crm)
+
+    corpo = client.get(reverse("operacoes:assinatura", args=[contrato.pk])).content.decode()
+    resposta = client.get(reverse("operacoes:baixar_documento", args=[contrato.pk, arquivo.pk]))
+
+    assert "Kit cadastral do perfil" in corpo
+    assert "conta-de-luz.pdf" in corpo
+    assert b"".join(resposta.streaming_content) == PDF
+
+
+def test_documento_do_contrato_nao_se_repete_no_kit(client, contrato, crm):
+    """O termo é do contrato: listá-lo duas vezes faria parecer dois documentos."""
+    _enviar(contrato, crm)
+    client.force_login(crm)
+
+    resposta = client.get(reverse("operacoes:assinatura", args=[contrato.pk]))
+
+    assert list(resposta.context["documentos_do_perfil"]) == []
+
+
+def test_documento_de_outro_contrato_nao_vaza(client, contrato, crm, contraparte_sem_habilitacao):
+    """Trocar o id na URL não pode entregar documento de outra contraparte."""
+    alheio = DocumentoCadastral.objects.create(
+        contraparte=contraparte_sem_habilitacao, tipo=contrato.documentos_exigidos()[0]
+    )
+    arquivo = ArquivoDocumento.objects.create(
+        documento=alheio, arquivo=SimpleUploadedFile("alheio.pdf", PDF)
+    )
+    client.force_login(crm)
+
+    resposta = client.get(reverse("operacoes:baixar_documento", args=[contrato.pk, arquivo.pk]))
+
+    assert resposta.status_code == 404
+
+
 def test_origem_desconhecida_e_recusada(client, contrato, crm):
     client.force_login(crm)
 

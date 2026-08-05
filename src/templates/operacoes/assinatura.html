@@ -70,6 +70,73 @@
 </section>
 
 <section class="cartao">
+  <h2>Documentos enviados</h2>
+  <p class="ajuda">
+    O que o Clube enviou, como foi enviado. Baixar aqui é leitura: não conclui etapa alguma.
+  </p>
+
+  <h3 class="subtitulo">Deste contrato</h3>
+  {% if documentos %}
+    <ul class="lista-kit">
+      {% for documento in documentos %}
+        {% for arquivo in documento.arquivos.all %}
+          <li class="lista-kit__item">
+            {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+            <span class="lista-kit__nome">
+              {{ documento.rotulo }}
+              <small class="ajuda">
+                {{ arquivo.nome_original|default:"arquivo" }}
+                {% if documento.enviado_por %}
+                  enviado por {{ documento.enviado_por }} em {{ documento.data_envio|data_hora_br }}
+                {% endif %}
+              </small>
+            </span>
+            <a class="botao botao--discreto"
+               href="{% url 'operacoes:baixar_documento' operacao.pk arquivo.pk %}">
+              Baixar
+            </a>
+          </li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhum documento enviado para este contrato.</p>
+  {% endif %}
+
+  <h3 class="subtitulo">
+    Kit cadastral do perfil
+    <small>validados uma vez e reaproveitados pelos contratos seguintes</small>
+  </h3>
+  {% if documentos_do_perfil %}
+    <ul class="lista-kit">
+      {% for documento in documentos_do_perfil %}
+        {% for arquivo in documento.arquivos.all %}
+          <li class="lista-kit__item">
+            {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+            <span class="lista-kit__nome">
+              {{ documento.rotulo }}
+              <small class="ajuda">
+                {{ arquivo.nome_original|default:"arquivo" }}
+                {% if documento.data_vencimento %}
+                  vale até {{ documento.data_vencimento|data_br }}
+                  {% if documento.esta_vencido %}(vencido){% endif %}
+                {% endif %}
+              </small>
+            </span>
+            <a class="botao botao--discreto"
+               href="{% url 'operacoes:baixar_documento' operacao.pk arquivo.pk %}">
+              Baixar
+            </a>
+          </li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhum documento cadastral no perfil desta contraparte.</p>
+  {% endif %}
+</section>
+
+<section class="cartao">
   <h2>Contrato para assinatura</h2>
 
   {% if liberado %}
@@ -99,7 +166,11 @@
               </small>
             </span>
             <a class="botao" href="{% url 'operacoes:baixar_para_assinatura' operacao.pk arquivo.pk %}">
-              {% if etapa_assinatura.data_decisao %}Baixar de novo{% else %}Baixar em PDF{% endif %}
+              {% if etapa_assinatura.data_decisao %}
+                Baixar de novo
+              {% else %}
+                Baixar em PDF para assinar
+              {% endif %}
             </a>
           </li>
         {% endfor %}
