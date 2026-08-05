@@ -78,15 +78,8 @@ class Command(BaseCommand):
         """Só para a simulação: o mesmo raciocínio de `avancar`, sem gravar."""
         from operacoes.estados import Etapa, StatusOperacao
 
-        if not operacao.documentacao_completa:
-            esperando = (
-                situacao["em_analise"] and not situacao["faltando"] and not situacao["com_problema"]
-            )
-            return (
-                StatusOperacao.EM_ANALISE_DOCUMENTAL
-                if esperando
-                else StatusOperacao.AGUARDANDO_DOCUMENTOS
-            )
+        if situacao["faltando"] or situacao["com_problema"]:
+            return StatusOperacao.AGUARDANDO_DOCUMENTOS
 
         proxima = operacao.etapa_atual
         if proxima is None:

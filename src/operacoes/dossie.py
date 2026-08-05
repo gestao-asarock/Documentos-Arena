@@ -10,6 +10,8 @@ compliance entram como detalhe da etapa correspondente, não como item à parte.
 
 from dataclasses import dataclass, field
 
+from django.urls import reverse
+
 from contrapartes.models import Habilitacao
 from documentos.models import StatusDocumento
 
@@ -32,6 +34,15 @@ EXTERNA = "externa"
 
 
 @dataclass
+class Anexo:
+    """Arquivo que sustenta a checagem, baixável de dentro do dossiê."""
+
+    titulo: str
+    url: str
+    descricao: str = ""
+
+
+@dataclass
 class Checagem:
     titulo: str
     situacao: str
@@ -39,9 +50,28 @@ class Checagem:
     data: object = None
     detalhe: str = ""
     itens: list = field(default_factory=list)
+    #: Texto que a área escreveu (justificativa do veredito, por exemplo).
+    observacao: str = ""
+    anexos: list = field(default_factory=list)
 
 
-def _do_perfil(habilitacao: Habilitacao | None) -> list[Checagem]:
+def _anexos_do_parecer(parecer, operacao, origem: str) -> list[Anexo]:
+    """Relatórios de compliance ou de crédito, com link de download.
+
+    Quem assina precisa poder ler o parecer inteiro, não só o veredito: é o que
+    sustenta a assinatura numa auditoria (AGENTS.md §4.10).
+    """
+    return [
+        Anexo(
+            titulo=relatorio.nome_original or "relatório",
+            url=reverse("operacoes:baixar_relatorio", args=[operacao.pk, origem, relatorio.pk]),
+            descricao=relatorio.descricao,
+        )
+        for relatorio in parecer.relatorios.all()
+    ]
+
+
+def _do_perfil(habilitacao: Habilitacao | None, operacao) -> list[Checagem]:
     """As validações do perfil, que não se repetem por contrato (D29)."""
     if habilitacao is None:
         return [Checagem("Perfil da contraparte", PENDENTE, detalhe="Perfil não validado.")]
@@ -72,18 +102,19 @@ def _do_perfil(habilitacao: Habilitacao | None) -> list[Checagem]:
                 CONCLUIDA,
                 responsavel=str(parecer.analista or "-"),
                 data=parecer.data_conclusao,
-                detalhe=f"{parecer.get_veredito_display()}. {parecer.justificativa}",
-                itens=[f"{rotulo}: {texto}" for rotulo, texto in parecer.blocos_preenchidos()],
+                detalhe=f"{parecer.get_veredito_display()}.",
+                observacao=parecer.justificativa,
+                anexos=_anexos_do_parecer(parecer, operacao, "compliance"),
             )
         )
     else:
         checagens.append(Checagem("Due diligence (Compliance)", PENDENTE))
 
-    checagens.append(_credito_do_perfil(habilitacao))
+    checagens.append(_credito_do_perfil(habilitacao, operacao))
     return checagens
 
 
-def _credito_do_perfil(habilitacao: Habilitacao) -> Checagem:
+def _credito_do_perfil(habilitacao: Habilitacao, operacao) -> Checagem:
     """A análise de crédito acontece na esteira do perfil, uma vez só (D30)."""
     from credito.models import ParecerCredito
 
@@ -107,13 +138,21 @@ def _credito_do_perfil(habilitacao: Habilitacao) -> Checagem:
         CONCLUIDA,
         responsavel=str(parecer.analista or "-"),
         data=parecer.data_conclusao,
-        detalhe=f"{parecer.get_veredito_display()}. {parecer.justificativa}",
-        itens=[f"{rotulo}: {texto}" for rotulo, texto in parecer.blocos_preenchidos()],
+        detalhe=f"{parecer.get_veredito_display()}.",
+        observacao=parecer.justificativa,
+        anexos=_anexos_do_parecer(parecer, operacao, "credito"),
     )
 
 
 def _documentos_do_contrato(operacao) -> Checagem:
-    """Estado real da documentação: aprovada, em conferência, ou faltando."""
+    """Estado real da documentação: enviada, recusada, ou faltando.
+
+    **Enviar já conclui esta checagem**, mesmo antes da conferência. O que ela
+    responde é "o Clube fez a parte dele?", e conferir o conteúdo é trabalho da
+    revisão jurídica, que aparece logo abaixo como a etapa pendente. Enquanto
+    dizia "pendente" com o documento já enviado, a tela cobrava duas vezes a
+    mesma coisa e escondia de quem lê onde a bola realmente está.
+    """
     situacao = operacao.situacao_documental()
 
     itens = [f"{d.rotulo}: {d.get_status_display()}" for d in situacao["aprovados"]]
@@ -126,16 +165,29 @@ def _documentos_do_contrato(operacao) -> Checagem:
             "Documentos do contrato", CONCLUIDA, detalhe="Nenhuma exigência além do perfil."
         )
 
-    if operacao.documentacao_completa:
-        estado, detalhe = CONCLUIDA, "Documentação conferida e aprovada."
-    elif situacao["com_problema"]:
+    if situacao["com_problema"]:
         estado, detalhe = ATENCAO, "Documento recusado: precisa de reenvio."
     elif situacao["faltando"]:
         estado, detalhe = PENDENTE, "Falta enviar documento exigido."
+    elif operacao.documentacao_completa:
+        estado, detalhe = CONCLUIDA, "Documentação conferida e aprovada."
     else:
-        estado, detalhe = PENDENTE, "Enviado, aguardando conferência."
+        estado, detalhe = CONCLUIDA, "Documentação enviada; a conferência é da revisão jurídica."
 
-    return Checagem("Documentos do contrato", estado, detalhe=detalhe, itens=itens)
+    envio = _ultimo_envio(operacao)
+    return Checagem(
+        "Documentos do contrato",
+        estado,
+        responsavel=str(envio.enviado_por or "-") if envio else "",
+        data=envio.data_envio if envio else None,
+        detalhe=detalhe,
+        itens=itens,
+    )
+
+
+def _ultimo_envio(operacao):
+    """O documento mais recente do contrato: diz quem enviou e quando."""
+    return operacao.documentos.order_by("-data_envio").first()
 
 
 def _situacao_da_etapa(etapa) -> str:
@@ -151,7 +203,7 @@ def _situacao_da_etapa(etapa) -> str:
 
 def montar(operacao) -> list[Checagem]:
     """Todas as checagens do contrato, sem repetir nenhuma."""
-    checagens = _do_perfil(operacao.contraparte.habilitacao_vigente)
+    checagens = _do_perfil(operacao.contraparte.habilitacao_vigente, operacao)
     checagens.append(_documentos_do_contrato(operacao))
 
     for etapa in operacao.etapas.all():

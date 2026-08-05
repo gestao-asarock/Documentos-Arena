@@ -213,11 +213,17 @@ def decidir_etapa(
 
     # O fluxo é linear: ninguém analisa o que ainda não foi enviado. Sem isto era
     # possível aprovar a revisão jurídica de um contrato inexistente.
-    if not operacao.documentacao_completa:
-        faltando = ", ".join(tipo.nome for tipo in operacao.documentos_pendentes())
+    #
+    # O que se exige aqui é o **envio**, não a aprovação: quem confere o Termo de
+    # Adesão é esta etapa. Exigir uma triagem antes travava o contrato num
+    # impasse — o jurídico via "aguardando conferência" e não tinha como conferir.
+    if not operacao.documentacao_entregue:
+        situacao = operacao.situacao_documental()
+        pendentes = [tipo.nome for tipo in situacao["faltando"]]
+        pendentes += [documento.rotulo for documento in situacao["com_problema"]]
         raise TransicaoInvalida(
-            f"Documentação incompleta: falta {faltando}. "
-            "Envie e aprove os documentos antes de decidir as etapas."
+            f"Documentação incompleta: falta {', '.join(pendentes)}. "
+            "Envie os documentos do contrato antes de decidir as etapas."
         )
 
     etapa.status = StatusEtapa.APROVADA if aprovada else StatusEtapa.REPROVADA
@@ -234,6 +240,8 @@ def decidir_etapa(
     )
 
     if aprovada:
+        if Etapa(etapa.etapa) == Etapa.JURIDICO:
+            _aprovar_documentos_conferidos(operacao, usuario=usuario)
         avancar(operacao, etapa_decidida=Etapa(etapa.etapa))
     else:
         # Reprovação em qualquer etapa interrompe o fluxo (AGENTS.md §4.7).
@@ -241,6 +249,26 @@ def decidir_etapa(
         operacao.save()
 
     return etapa
+
+
+def _aprovar_documentos_conferidos(operacao: Operacao, *, usuario) -> None:
+    """Aprovar a revisão jurídica aprova o que ela acabou de conferir.
+
+    Sem isto o documento ficaria "enviado" para sempre: nada mais no fluxo o
+    aprovaria, e a assinatura — que exige documentação **aprovada** — nunca
+    seria liberada (AGENTS.md §4.9, D33).
+    """
+    from documentos.models import StatusDocumento
+
+    for documento in operacao.situacao_documental()["em_analise"]:
+        documento.status = StatusDocumento.APROVADO
+        documento.save()
+        registrar(
+            acao=Acao.APROVACAO,
+            descricao=f"{documento.rotulo} aprovado na revisão jurídica do contrato #{operacao.pk}",
+            objeto=documento,
+            usuario=usuario,
+        )
 
 
 def registrar_download_para_assinatura(operacao: Operacao, *, usuario) -> EtapaAprovacao | None:
@@ -312,18 +340,10 @@ def avancar(operacao: Operacao, *, etapa_decidida: Etapa | None = None) -> Opera
         return operacao
 
     # A ordem importa: sem os documentos do contrato não há o que analisar, então
-    # a falta deles vem antes de qualquer etapa. E falta enviar é diferente de
-    # enviado esperando conferência — o estado precisa dizer qual dos dois é.
-    if not operacao.documentacao_completa:
-        situacao = operacao.situacao_documental()
-        esperando_conferencia = (
-            situacao["em_analise"] and not situacao["faltando"] and not situacao["com_problema"]
-        )
-        destino = (
-            StatusOperacao.EM_ANALISE_DOCUMENTAL
-            if esperando_conferencia
-            else StatusOperacao.AGUARDANDO_DOCUMENTOS
-        )
+    # a falta deles vem antes de qualquer etapa. Enviado já basta para a etapa
+    # correr: é a revisão jurídica que confere o que foi enviado.
+    if not operacao.documentacao_entregue:
+        destino = StatusOperacao.AGUARDANDO_DOCUMENTOS
     elif proxima.etapa == Etapa.ASSINATURAS:
         destino = StatusOperacao.AGUARDANDO_ASSINATURA
     else:

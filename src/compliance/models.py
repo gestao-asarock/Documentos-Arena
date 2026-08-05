@@ -1,12 +1,12 @@
 """
 Parecer de due diligence (AGENTS.md §4.7).
 
-No MVP a análise é **manual** (D22): o analista consulta as fontes, registra o que
-encontrou bloco a bloco, anexa evidências e conclui com um veredito de risco. A
-integração com a Trillia entra depois, preenchendo os mesmos campos.
+No MVP a análise é **manual** (D22): o analista consulta as fontes fora daqui,
+anexa o **relatório** em PDF e conclui com um veredito de risco. O sistema não
+pede que ele redigite o conteúdo do relatório em campos separados: o documento é
+a evidência, e o que fica registrado aqui é a decisão humana sobre ele.
 
-Campos separados por bloco, não um texto único: assim o parecer vira dado
-auditável e comparável entre contrapartes.
+Sem relatório anexado não há veredito — é o relatório que sustenta a conclusão.
 """
 
 from django.db import models
@@ -27,20 +27,6 @@ class StatusParecer(models.TextChoices):
     CONCLUIDO = "concluido", "Concluído"
 
 
-class BlocoParecer(models.TextChoices):
-    """Os blocos de verificação, na ordem em que aparecem na tela."""
-
-    SITUACAO_CADASTRAL = "situacao_cadastral", "Situação cadastral"
-    PROCESSOS = "processos", "Processos judiciais e administrativos"
-    SANCOES = "sancoes", "Sanções e listas restritivas"
-    PEP = "pep", "Pessoa exposta politicamente (PEP)"
-    BLOQUEIOS = "bloqueios", "Bloqueios e restrições"
-    MIDIA_ADVERSA = "midia_adversa", "Mídia adversa (webcheck)"
-    BENEFICIARIO_FINAL = "beneficiario_final", "Beneficiário final e grupo econômico"
-    SOCIOS = "socios", "Sócios e administradores"
-    PARTE_RELACIONADA = "parte_relacionada", "Parte relacionada e conflito de interesse"
-
-
 class ParecerCompliance(models.Model):
     habilitacao = models.OneToOneField(
         Habilitacao, on_delete=models.CASCADE, related_name="parecer_compliance"
@@ -49,65 +35,12 @@ class ParecerCompliance(models.Model):
         max_length=16, choices=StatusParecer.choices, default=StatusParecer.RASCUNHO
     )
 
-    # --- Blocos de verificação (§4.7) ---
-    situacao_cadastral = models.TextField(
-        "situação cadastral",
-        blank=True,
-        help_text="CPF regular / CNPJ ativo. Para PJ, se o CNAE é compatível com o contratado.",
-    )
-    processos = models.TextField(
-        blank=True,
-        help_text="Cível, criminal, trabalhista, fiscal e execuções; separe por esfera.",
-    )
-    sancoes = models.TextField(
-        "sanções e listas restritivas",
-        blank=True,
-        help_text="ONU, OFAC, União Europeia; CEIS, CNEP, CEPIM, inidôneos do TCU, "
-        "lista suja do trabalho escravo, CADIN.",
-    )
-    pep = models.TextField(
-        "PEP",
-        blank=True,
-        help_text="Titular, sócios, administradores, beneficiário final e "
-        "familiares/relacionados próximos.",
-    )
-    bloqueios = models.TextField(
-        "bloqueios e restrições",
-        blank=True,
-        help_text="Indisponibilidade de bens, restrições cadastrais.",
-    )
-    midia_adversa = models.TextField(
-        "mídia adversa",
-        blank=True,
-        help_text="O que foi encontrado na busca por notícias negativas.",
-    )
-    termos_pesquisados = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Palavras-chave usadas no webcheck; registre para o parecer ser refazível.",
-    )
-    beneficiario_final = models.TextField(
-        "beneficiário final e grupo econômico",
-        blank=True,
-        help_text="Quem controla de fato, e a que grupo pertence. Só para PJ.",
-    )
-    socios = models.TextField(
-        "sócios e administradores",
-        blank=True,
-        help_text="As mesmas checagens replicadas nos sócios relevantes. Só para PJ.",
-    )
-    parte_relacionada = models.TextField(
-        "parte relacionada e conflito de interesse",
-        blank=True,
-        help_text="Vínculo com o Fundo, o Clube ou a gestora.",
-    )
-
     # --- Conclusão ---
     veredito = models.CharField(
         max_length=16, choices=Veredito.choices, blank=True, help_text="Obrigatório para concluir."
     )
     justificativa = models.TextField(
-        blank=True, help_text="Por que este veredito. Obrigatório para concluir."
+        blank=True, help_text="Opcional: o relatório anexado já sustenta o veredito."
     )
     comunicado_ao_coaf = models.BooleanField(
         "comunicado ao COAF/UIF",
@@ -137,34 +70,17 @@ class ParecerCompliance(models.Model):
     def eh_risco_alto(self) -> bool:
         return self.veredito == Veredito.ALTO
 
-    def blocos_preenchidos(self) -> list[tuple[str, str]]:
-        """Blocos com conteúdo, para exibição em leitura."""
-        return [
-            (BlocoParecer(campo).label, getattr(self, campo))
-            for campo in BlocoParecer.values
-            if getattr(self, campo, "")
-        ]
-
-    def blocos_em_branco(self) -> list[str]:
-        """Blocos ainda não preenchidos — aviso, não impedimento.
-
-        Nem todo bloco se aplica a toda contraparte: sócios e beneficiário final
-        não fazem sentido para pessoa física.
-        """
-        return [
-            BlocoParecer(campo).label
-            for campo in BlocoParecer.values
-            if not getattr(self, campo, "")
-        ]
+    @property
+    def tem_relatorio(self) -> bool:
+        return self.relatorios.exists()
 
 
-class EvidenciaParecer(models.Model):
-    """Print ou documento que sustenta o que foi registrado num bloco."""
+class RelatorioParecer(models.Model):
+    """O relatório de due diligence, em PDF. É ele que sustenta o veredito."""
 
     parecer = models.ForeignKey(
-        ParecerCompliance, on_delete=models.CASCADE, related_name="evidencias"
+        ParecerCompliance, on_delete=models.CASCADE, related_name="relatorios"
     )
-    bloco = models.CharField(max_length=32, choices=BlocoParecer.choices)
     arquivo = models.FileField(upload_to="compliance/%Y/%m/")
     nome_original = models.CharField(max_length=255, blank=True)
     descricao = models.CharField("descrição", max_length=255, blank=True)
@@ -174,9 +90,9 @@ class EvidenciaParecer(models.Model):
     )
 
     class Meta:
-        verbose_name = "evidência do parecer"
-        verbose_name_plural = "evidências do parecer"
-        ordering = ("bloco", "data_envio")
+        verbose_name = "relatório do parecer"
+        verbose_name_plural = "relatórios do parecer"
+        ordering = ("data_envio",)
 
     def __str__(self) -> str:
-        return f"{self.get_bloco_display()}: {self.nome_original or self.arquivo.name}"
+        return self.nome_original or self.arquivo.name

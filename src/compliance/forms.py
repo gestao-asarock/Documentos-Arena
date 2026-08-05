@@ -2,9 +2,10 @@
 
 from django import forms
 
-from documentos.validadores import ACCEPT_HTML, validar_documento
+from documentos.validadores import ACCEPT_HTML_SO_PDF, validar_pdf
+from solicitacoes.campos import MultiploArquivoField
 
-from .models import BlocoParecer, EvidenciaParecer, ParecerCompliance
+from .models import ParecerCompliance
 
 
 class ParecerForm(forms.ModelForm):
@@ -13,40 +14,36 @@ class ParecerForm(forms.ModelForm):
         # `comunicado_ao_coaf` existe no modelo mas ficou fora da tela: não altera
         # o fluxo e confunde quem preenche. Volta quando o compliance definir se
         # quer registrar a comunicação por aqui (P9 no CLAUDE.md).
-        fields = list(BlocoParecer.values) + [
-            "termos_pesquisados",
-            "veredito",
-            "justificativa",
-        ]
-        widgets = {campo: forms.Textarea(attrs={"rows": 3}) for campo in BlocoParecer.values}
+        fields = ["veredito", "justificativa"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["justificativa"].widget = forms.Textarea(attrs={"rows": 3})
+        self.fields["justificativa"].label = "Justificativa (opcional)"
         # O veredito é validado ao concluir, não ao salvar rascunho.
         self.fields["veredito"].required = False
 
-    @property
-    def campos_dos_blocos(self):
-        """Os blocos de verificação, para o template renderizar em seção própria."""
-        return [self[campo] for campo in BlocoParecer.values]
 
-    @property
-    def campos_da_conclusao(self):
-        return [self["termos_pesquisados"], self["veredito"], self["justificativa"]]
+class RelatorioForm(forms.Form):
+    """Um ou mais PDFs de relatório, enviados de uma vez."""
 
-
-class EvidenciaForm(forms.ModelForm):
-    class Meta:
-        model = EvidenciaParecer
-        fields = ("bloco", "arquivo", "descricao")
+    arquivos = MultiploArquivoField(
+        label="Relatório",
+        help_text="Somente PDF, até 25 MB cada. Pode enviar mais de um arquivo.",
+    )
+    descricao = forms.CharField(
+        label="Comentário (opcional)",
+        max_length=255,
+        required=False,
+        help_text="Vale para todos os arquivos deste envio.",
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["arquivo"].widget.attrs["accept"] = ACCEPT_HTML
-        self.fields["arquivo"].help_text = "Print ou documento. PDF, JPG ou PNG, até 25 MB."
+        self.fields["arquivos"].widget.attrs["accept"] = ACCEPT_HTML_SO_PDF
 
-    def clean_arquivo(self):
-        arquivo = self.cleaned_data["arquivo"]
-        validar_documento(arquivo)
-        return arquivo
+    def clean_arquivos(self) -> list:
+        arquivos = self.cleaned_data["arquivos"]
+        for arquivo in arquivos:
+            validar_pdf(arquivo)
+        return arquivos

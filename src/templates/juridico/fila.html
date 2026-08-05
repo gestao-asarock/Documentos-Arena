@@ -28,9 +28,9 @@
     </thead>
     <tbody>
       {% for operacao in prontos %}
-        <tr data-href="{% url 'operacoes:detalhe' operacao.pk %}" class="linha-clicavel">
+        <tr data-href="{% url 'juridico:revisar' operacao.pk %}" class="linha-clicavel">
           <td>{{ operacao.pk }}</td>
-          <td><a href="{% url 'operacoes:detalhe' operacao.pk %}">{{ operacao.contraparte.nome }}</a></td>
+          <td><a href="{% url 'juridico:revisar' operacao.pk %}">{{ operacao.contraparte.nome }}</a></td>
           <td>{{ operacao.descricao }}</td>
           <td class="tabela__numero">{{ operacao.valor_total|moeda }}</td>
           <td>{{ operacao.data_evento|data_br }}</td>

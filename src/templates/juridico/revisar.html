@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% load formatacao %}
+
+{% block titulo %}Revisão jurídica | Contrato #{{ operacao.pk }}{% endblock %}
+
+{% block conteudo %}
+<div class="pagina__topo">
+  <h1>Contrato #{{ operacao.pk }}: revisão jurídica</h1>
+  {% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}
+</div>
+
+<section class="cartao">
+  <h2>Contrato</h2>
+  <dl class="dados">
+    <div><dt>Contraparte</dt><dd>{{ contraparte.nome }}</dd></div>
+    <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento|cpf_cnpj }}</dd></div>
+    <div><dt>Tipo</dt><dd>{{ operacao.tipo_operacao }}</dd></div>
+    <div><dt>Enquadramento</dt><dd>{{ operacao.regra.criterio|default:"-" }}</dd></div>
+    <div><dt>Evento</dt><dd>{{ operacao.descricao }}</dd></div>
+    <div><dt>Valor</dt><dd>{{ operacao.valor_total|moeda }}</dd></div>
+  </dl>
+  <p class="ajuda">
+    Perfil já validado no compliance e no crédito.
+    <a href="{% url 'operacoes:assinatura' operacao.pk %}">Ver as checagens do dossiê</a>.
+  </p>
+</section>
+
+<section class="cartao">
+  <h2>Documentos do contrato</h2>
+  {% if documentos %}
+    <ul class="lista-kit">
+      {% for documento in documentos %}
+        {% for arquivo in documento.arquivos.all %}
+          <li class="lista-kit__item">
+            {% include "operacoes/_situacao.html" with status=documento.status rotulo=documento.get_status_display %}
+            <span class="lista-kit__nome">
+              {{ documento.rotulo }}
+              <small class="ajuda">
+                {{ arquivo.nome_original|default:"arquivo" }}
+                {% if documento.enviado_por %}
+                  enviado por {{ documento.enviado_por }} em {{ documento.data_envio|data_hora_br }}
+                {% endif %}
+              </small>
+            </span>
+            <a class="botao botao--discreto"
+               href="{% url 'juridico:baixar_arquivo' operacao.pk arquivo.pk %}" target="_blank">
+              Abrir
+            </a>
+          </li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="aviso aviso--atencao">
+      &#9888; Nenhum documento enviado para este contrato. Não há o que revisar.
+    </p>
+  {% endif %}
+</section>
+
+{% if pode_decidir %}
+  <form method="post" action="{% url 'juridico:decidir' operacao.pk %}" class="formulario">
+    {% csrf_token %}
+
+    <section class="cartao">
+      <h2>O que conferir</h2>
+      <p class="ajuda">
+        O <strong>Termo de Adesão</strong> precisa repetir exatamente os dados abaixo. O
+        contrato-mãe é modelo base e não muda entre operações: a análise recai sobre o termo.
+        <strong>Aprovar exige marcar todos os campos.</strong>
+      </p>
+      <table class="tabela tabela--conferencia">
+        <thead>
+          <tr><th>Campo</th><th>Registrado na operação</th><th>Confere?</th></tr>
+        </thead>
+        <tbody>
+          {% for campo in conferencia %}
+            <tr>
+              <td>
+                {{ campo.rotulo }}
+                {% if campo.observacao %}<small class="ajuda">{{ campo.observacao }}</small>{% endif %}
+              </td>
+              <td><strong>{{ campo.valor }}</strong></td>
+              <td class="celula-confere">
+                <label class="confere">
+                  <input type="checkbox" name="confere" value="{{ campo.chave }}">
+                  <span class="confere__rotulo">Confere</span>
+                </label>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="cartao">
+      <h2>Decisão</h2>
+      <p class="ajuda">
+        Aprovar conclui a etapa 4 e <strong>aprova os documentos conferidos</strong>,
+        liberando o contrato para a coleta de assinaturas. Reprovar encerra o contrato, e
+        não exige as marcações: reprova-se justamente porque algum campo não confere.
+      </p>
+      <div class="campo">
+        <label for="parecer">
+          Parecer <span class="obrigatorio" aria-hidden="true">*</span>
+        </label>
+        <textarea id="parecer" name="parecer" rows="3" required
+                  placeholder="O que foi conferido, e o que sustenta a decisão."></textarea>
+        <small class="ajuda">Obrigatório: vai para a auditoria junto com o seu nome.</small>
+      </div>
+      <div class="acoes">
+        <button type="submit" name="acao" value="aprovar" class="botao botao--grande">Aprovar</button>
+        <button type="submit" name="acao" value="reprovar" class="botao botao--perigo botao--grande">
+          Reprovar
+        </button>
+      </div>
+    </section>
+  </form>
+{% else %}
+  <section class="cartao">
+    <h2>O que conferir</h2>
+    <table class="tabela tabela--conferencia">
+      <thead>
+        <tr><th>Campo</th><th>Registrado na operação</th></tr>
+      </thead>
+      <tbody>
+        {% for campo in conferencia %}
+          <tr>
+            <td>{{ campo.rotulo }}</td>
+            <td><strong>{{ campo.valor }}</strong></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cartao">
+    <h2>Decisão</h2>
+    {% if etapa_registrada.esta_decidida %}
+      <p class="aviso {% if etapa_registrada.status == 'aprovada' %}aviso--sucesso{% else %}aviso--erro{% endif %}">
+        {{ etapa_registrada.get_status_display }} por
+        {{ etapa_registrada.decidida_por|default:"-" }} em
+        {{ etapa_registrada.data_decisao|data_hora_br }}.
+      </p>
+      <p>{{ etapa_registrada.parecer }}</p>
+    {% else %}
+      <p class="aviso aviso--atencao">
+        &#9888; Este contrato ainda não chegou à revisão jurídica: faltam documentos ou
+        etapas anteriores.
+        <a href="{% url 'operacoes:detalhe' operacao.pk %}">Ver a situação do contrato</a>.
+      </p>
+    {% endif %}
+  </section>
+{% endif %}
+
+<p><a class="botao botao--discreto" href="{% url 'juridico:fila' %}">Voltar à fila</a></p>
+{% endblock %}

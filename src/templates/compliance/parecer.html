@@ -17,7 +17,6 @@
     {% if contraparte.data_nascimento %}
       <div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>
     {% endif %}
-    {% if contraparte.endereco %}<div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>{% endif %}
     {% if contraparte.endereco %}
       <div><dt>Endereço</dt><dd>{{ contraparte.endereco }}</dd></div>
     {% endif %}
@@ -26,7 +25,7 @@
   {% if contraparte.parte_relacionada %}
     <p class="aviso aviso--atencao">
       &#9888; Marcada como <strong>parte relacionada</strong>. Governança específica
-      ainda em discussão; registre a análise no bloco correspondente.
+      ainda em discussão; registre a análise no relatório.
     </p>
   {% endif %}
 </section>
@@ -57,35 +56,67 @@
       <strong>{{ parecer.get_veredito_display }}</strong>, por {{ parecer.analista|default:"-" }}
       em {{ parecer.data_conclusao|data_hora_br }}.
     </p>
-    <p>{{ parecer.justificativa }}</p>
-    <dl class="dados">
-      {% for rotulo, texto in parecer.blocos_preenchidos %}
-        <div><dt>{{ rotulo }}</dt><dd>{{ texto|linebreaksbr }}</dd></div>
+    {% if parecer.justificativa %}<p>{{ parecer.justificativa|linebreaksbr }}</p>{% endif %}
+    <ul class="lista-kit">
+      {% for relatorio in parecer.relatorios.all %}
+        <li class="lista-kit__item">
+          <span class="lista-kit__nome">
+            {{ relatorio.nome_original|default:"relatório" }}
+            {% if relatorio.descricao %}<small class="ajuda">{{ relatorio.descricao }}</small>{% endif %}
+          </span>
+        </li>
       {% endfor %}
-    </dl>
+    </ul>
   </section>
 {% else %}
-  <form method="post" class="formulario">
-    {% csrf_token %}
+  <section class="cartao">
+    <h2>Relatório</h2>
+    <p class="ajuda">
+      O relatório da due diligence, em PDF. É ele que sustenta o veredito: sem pelo menos
+      um arquivo anexado, a conclusão não é aceita.
+    </p>
+    <ul class="lista-kit">
+      {% for relatorio in parecer.relatorios.all %}
+        <li class="lista-kit__item">
+          <span class="lista-kit__nome">
+            {{ relatorio.nome_original|default:"relatório" }}
+            {% if relatorio.descricao %}<small class="ajuda">{{ relatorio.descricao }}</small>{% endif %}
+          </span>
+          <form method="post"
+                action="{% url 'compliance:remover_relatorio' habilitacao.pk relatorio.pk %}"
+                class="acao-inline"
+                data-confirmar="Remover “{{ relatorio.nome_original|default:'relatório' }}”? O arquivo é apagado e precisa ser enviado de novo.">
+            {% csrf_token %}
+            <button type="submit" class="botao botao--texto-perigo" title="Remover relatório">
+              Remover
+            </button>
+          </form>
+        </li>
+      {% empty %}
+        <li class="vazio">Nenhum relatório anexado.</li>
+      {% endfor %}
+    </ul>
 
-    <section class="cartao">
-      <h2>Verificações</h2>
-      <p class="ajuda">
-        Registre o que encontrou em cada fonte. Bloco que não se aplica pode ficar em branco:
-        sócios e beneficiário final não valem para pessoa física.
-      </p>
-      {% for campo in form.campos_dos_blocos %}
+    <form method="post" action="{% url 'compliance:anexar_relatorio' habilitacao.pk %}"
+          enctype="multipart/form-data" class="formulario">
+      {% csrf_token %}
+      {% for campo in form_relatorio %}
         <div class="campo">
           <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
           {{ campo }}
           {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
         </div>
       {% endfor %}
-    </section>
+      <div class="acoes"><button type="submit" class="botao">Anexar relatório</button></div>
+    </form>
+  </section>
+
+  <form method="post" class="formulario">
+    {% csrf_token %}
 
     <section class="cartao">
       <h2>Conclusão</h2>
-      {% for campo in form.campos_da_conclusao %}
+      {% for campo in form %}
         <div class="campo">
           <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
           {{ campo }}
@@ -94,10 +125,9 @@
         </div>
       {% endfor %}
 
-      {% if parecer.blocos_em_branco %}
+      {% if not parecer.tem_relatorio %}
         <p class="aviso aviso--atencao">
-          &#9888; Sem registro em: {{ parecer.blocos_em_branco|join:", " }}.
-          Confirme que não se aplicam antes de concluir.
+          &#9888; Anexe o relatório antes de concluir: o veredito precisa dele.
         </p>
       {% endif %}
 
@@ -111,36 +141,6 @@
       </div>
     </section>
   </form>
-
-  <section class="cartao">
-    <h2>Evidências</h2>
-    <ul class="lista-kit">
-      {% for evidencia in parecer.evidencias.all %}
-        <li class="lista-kit__item">
-          <span class="estado estado--neutro">{{ evidencia.get_bloco_display }}</span>
-          <span class="lista-kit__nome">
-            {{ evidencia.nome_original }}
-            {% if evidencia.descricao %}<small class="ajuda">{{ evidencia.descricao }}</small>{% endif %}
-          </span>
-        </li>
-      {% empty %}
-        <li class="vazio">Nenhuma evidência anexada.</li>
-      {% endfor %}
-    </ul>
-
-    <form method="post" action="{% url 'compliance:anexar_evidencia' habilitacao.pk %}"
-          enctype="multipart/form-data" class="formulario">
-      {% csrf_token %}
-      {% for campo in form_evidencia %}
-        <div class="campo">
-          <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
-          {{ campo }}
-          {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
-        </div>
-      {% endfor %}
-      <div class="acoes"><button type="submit" class="botao">Anexar evidência</button></div>
-    </form>
-  </section>
 
   <section class="cartao">
     <h2>Recusar contraparte</h2>

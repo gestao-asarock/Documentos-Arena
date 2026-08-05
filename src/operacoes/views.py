@@ -20,7 +20,6 @@ from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
 from integracoes.conversao import ConversaoIndisponivel, converter_docx_em_pdf
 
-from .conferencia import campos_do_contrato
 from .dossie import montar as montar_dossie
 from .dossie import pronto_para_assinatura
 from .estados import Etapa, TransicaoInvalida
@@ -70,8 +69,8 @@ def detalhe(request, pk: int):
     etapa_atual = operacao.etapa_atual
     form_envio = EnvioDocumentoContratoForm(operacao=operacao)
 
-    # A revisão jurídica do piloto é conferência de campos: o Termo de Adesão
-    # precisa repetir o que foi registrado aqui (AGENTS.md §4.9).
+    # A revisão jurídica tem tela própria (AGENTS.md D52): aqui a operação só
+    # aponta o caminho para quem tem papel de revisar.
     na_revisao_juridica = bool(etapa_atual) and etapa_atual.etapa == Etapa.JURIDICO
 
     # A etapa 5 não se decide por parecer: ela se cumpre baixando o contrato. A
@@ -85,8 +84,10 @@ def detalhe(request, pk: int):
             "operacao": operacao,
             "etapas": operacao.etapas.all(),
             "etapa_atual": etapa_atual,
-            # Documentação incompleta trava todas as etapas: o fluxo é linear.
             "documentacao_completa": operacao.documentacao_completa,
+            # O que destrava as etapas é o **envio**: conferir o documento é o
+            # trabalho da revisão jurídica, não um pré-requisito dela.
+            "documentacao_entregue": operacao.documentacao_entregue,
             "na_assinatura": na_assinatura,
             "pode_baixar_contrato": (
                 na_assinatura
@@ -96,12 +97,18 @@ def detalhe(request, pk: int):
             "pode_decidir": (
                 bool(etapa_atual)
                 and not na_assinatura
-                and operacao.documentacao_completa
+                and not na_revisao_juridica
+                and operacao.documentacao_entregue
+                and pode_decidir(request.user, etapa_atual)
+            ),
+            "na_revisao_juridica": na_revisao_juridica,
+            "pode_revisar": (
+                na_revisao_juridica
+                and operacao.documentacao_entregue
                 and pode_decidir(request.user, etapa_atual)
             ),
             "pode_cancelar": operacao.pode_ser_cancelada and pode_cancelar(request.user, operacao),
             "form_decisao": DecisaoEtapaForm(),
-            "conferencia": campos_do_contrato(operacao) if na_revisao_juridica else None,
             "documentos_exigidos": operacao.documentos_exigidos(),
             "documentos_pendentes": operacao.documentos_pendentes(),
             # Separa "falta enviar" de "enviado, aguardando conferência": o mesmo
@@ -110,10 +117,9 @@ def detalhe(request, pk: int):
             "tipos_a_enviar": operacao.tipos_a_enviar(),
             "form_documentos": VincularDocumentosForm(operacao=operacao),
             "form_envio": form_envio,
-            "config_campos": {
-                "subtipo": getattr(form_envio, "tipos_com_subtipo", []),
-                "emissao": getattr(form_envio, "tipos_com_emissao", []),
-            },
+            # Documento de contrato não pede data de emissão: só o subtipo depende
+            # do tipo escolhido.
+            "config_campos": {"subtipo": getattr(form_envio, "tipos_com_subtipo", [])},
         },
     )
 
@@ -258,6 +264,55 @@ def baixar_para_assinatura(request, pk: int, arquivo_id: int):
     )
 
 
+#: De onde vem o relatório do dossiê. O acesso é governado pela visibilidade do
+#: **contrato**, não pelo papel da área: quem pode assinar precisa poder ler o
+#: parecer que sustenta a assinatura (AGENTS.md §4.10, §6).
+RELATORIOS_DO_DOSSIE = {
+    "compliance": ("compliance.RelatorioParecer", "parecer__habilitacao__contraparte"),
+    "credito": ("credito.RelatorioCredito", "parecer__contraparte"),
+}
+
+
+@login_required
+def baixar_relatorio(request, pk: int, origem: str, relatorio_id: int):
+    """Entrega o relatório de compliance ou de crédito a quem vê o contrato.
+
+    Nunca exponha a pasta de uploads nem a URL do bucket: o acesso passa por
+    aqui, que confere permissão e registra o download na auditoria.
+    """
+    from django.apps import apps
+
+    if origem not in RELATORIOS_DO_DOSSIE:
+        raise PermissionDenied
+
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+    rotulo_modelo, caminho_contraparte = RELATORIOS_DO_DOSSIE[origem]
+    Modelo = apps.get_model(rotulo_modelo)
+
+    # O relatório precisa ser da contraparte deste contrato: sem isso, trocar o
+    # id na URL leria o parecer de outra pessoa.
+    relatorio = get_object_or_404(
+        Modelo, pk=relatorio_id, **{caminho_contraparte: operacao.contraparte}
+    )
+
+    registrar(
+        acao=Acao.DOWNLOAD,
+        descricao=f"Relatório de {origem} baixado no dossiê do contrato #{operacao.pk}",
+        objeto=operacao,
+        usuario=request.user,
+    )
+
+    if settings.ARMAZENAMENTO == "s3":
+        # No S3 o acesso é por URL assinada de curta duração, gerada agora.
+        return redirect(relatorio.arquivo.url)
+
+    return FileResponse(
+        relatorio.arquivo.open("rb"),
+        as_attachment=True,
+        filename=relatorio.nome_original or Path(relatorio.arquivo.name).name,
+    )
+
+
 @login_required
 def enviar_documento(request, pk: int):
     """Envia documento complementar exigido pelo contrato.
@@ -281,7 +336,6 @@ def enviar_documento(request, pk: int):
         contraparte=operacao.contraparte,
         tipo=form.cleaned_data["tipo"],
         subtipo=form.cleaned_data.get("subtipo"),
-        data_emissao=form.cleaned_data["data_emissao"],
         enviado_por=request.user,
     )
     ArquivoDocumento.objects.bulk_create(

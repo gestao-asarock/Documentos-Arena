@@ -115,28 +115,29 @@ def test_tela_nao_mostra_o_mesmo_documento_em_dois_lugares(client, contrato, crm
     corpo = resposta.content.decode()
 
     assert resposta.context["situacao"]["faltando"] == []
-    assert "Aguardando conferência" in corpo
+    assert "Aguardando a revisão jurídica" in corpo
     assert "Faltando enviar" not in corpo
 
 
-def test_aviso_do_topo_reflete_a_conferencia(client, contrato, crm):
+def test_aviso_do_topo_aponta_para_o_juridico(client, contrato, crm):
+    """Enviado não fica "aguardando conferência": a conferência é do jurídico."""
     _enviar(contrato, crm)
     client.force_login(crm)
 
     corpo = client.get(reverse("operacoes:detalhe", args=[contrato.pk])).content.decode()
 
-    assert "aguardando conferência" in corpo
+    assert "aguardando a revisão jurídica" in corpo
     assert "Falta enviar" not in corpo
 
 
 def test_nao_diz_completa_com_documento_em_analise(client, contrato, crm):
-    """Dizia 'aguardando conferência' e '✓ completa' na mesma tela."""
+    """Documento enviado ainda não é documento aprovado."""
     _enviar(contrato, crm)
     client.force_login(crm)
 
     corpo = client.get(reverse("operacoes:detalhe", args=[contrato.pk])).content.decode()
 
-    assert "Aguardando conferência" in corpo
+    assert "Aguardando a revisão jurídica" in corpo
     assert "Documentação do contrato completa" not in corpo
 
 
@@ -148,4 +149,4 @@ def test_diz_completa_apos_aprovacao(client, contrato, crm):
     corpo = client.get(reverse("operacoes:detalhe", args=[contrato.pk])).content.decode()
 
     assert "Documentação do contrato completa e aprovada" in corpo
-    assert "Aguardando conferência" not in corpo
+    assert "Aguardando a revisão jurídica" not in corpo

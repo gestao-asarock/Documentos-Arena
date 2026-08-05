@@ -9,10 +9,12 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
 
 from contas.models import Papel, Usuario
 from contrapartes.models import Contraparte, Habilitacao, StatusHabilitacao
-from credito.models import Veredito
+from credito.models import ParecerCredito, RelatorioCredito, Veredito
 from credito.servicos import (
     ParecerIncompleto,
     concluir_parecer_do_perfil,
@@ -49,8 +51,20 @@ def habilitacao(crm):
     return registro
 
 
+def _pdf(nome: str = "relatorio.pdf") -> SimpleUploadedFile:
+    """PDF mínimo: o validador olha a assinatura dos primeiros bytes, não o nome."""
+    return SimpleUploadedFile(nome, b"%PDF-1.4 conteudo ficticio", content_type="application/pdf")
+
+
+def _anexar_relatorio(parecer, usuario=None) -> RelatorioCredito:
+    return RelatorioCredito.objects.create(
+        parecer=parecer, arquivo=_pdf(), nome_original="relatorio.pdf", enviada_por=usuario
+    )
+
+
 def _concluir(habilitacao, crm, veredito=Veredito.BAIXO):
     parecer = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=crm)
+    _anexar_relatorio(parecer, crm)
     parecer.veredito = veredito
     parecer.justificativa = "Score 812, nada consta."
     concluir_parecer_do_perfil(parecer, habilitacao, usuario=crm)
@@ -98,11 +112,75 @@ def test_parecer_do_perfil_nasce_sem_enquadramento(habilitacao, crm):
     assert parecer.regra is None
 
 
-def test_concluir_exige_veredito_e_justificativa(habilitacao, crm):
+def test_concluir_exige_relatorio(habilitacao, crm):
+    """Veredito sem documento anexado é decisão sem lastro (AGENTS.md D50)."""
     parecer = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=crm)
+    parecer.veredito = Veredito.BAIXO
 
     with pytest.raises(ParecerIncompleto):
         concluir_parecer_do_perfil(parecer, habilitacao, usuario=crm)
+
+
+def test_concluir_exige_veredito(habilitacao, crm):
+    parecer = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=crm)
+    _anexar_relatorio(parecer, crm)
+
+    with pytest.raises(ParecerIncompleto):
+        concluir_parecer_do_perfil(parecer, habilitacao, usuario=crm)
+
+
+def test_justificativa_e_opcional(habilitacao, crm):
+    """O relatório já sustenta o veredito; o texto é um extra."""
+    parecer = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=crm)
+    _anexar_relatorio(parecer, crm)
+    parecer.veredito = Veredito.BAIXO
+
+    concluir_parecer_do_perfil(parecer, habilitacao, usuario=crm)
+
+    assert parecer.esta_concluido
+
+
+def test_relatorio_aceita_varios_pdfs_de_uma_vez(client, habilitacao, crm):
+    client.force_login(crm)
+
+    client.post(
+        reverse("credito:anexar_relatorio", args=[habilitacao.pk]),
+        {"arquivos": [_pdf("parte-1.pdf"), _pdf("parte-2.pdf")], "descricao": "Consulta ao Serasa"},
+    )
+
+    parecer = ParecerCredito.objects.get(contraparte=habilitacao.contraparte, regra=None)
+    assert parecer.relatorios.count() == 2
+
+
+def test_relatorio_recusa_o_que_nao_e_pdf(client, habilitacao, crm):
+    client.force_login(crm)
+    png = SimpleUploadedFile("print.png", b"\x89PNG\r\n\x1a\n resto", content_type="image/png")
+
+    client.post(reverse("credito:anexar_relatorio", args=[habilitacao.pk]), {"arquivos": [png]})
+
+    parecer = ParecerCredito.objects.get(contraparte=habilitacao.contraparte, regra=None)
+    assert not parecer.tem_relatorio
+
+
+def test_relatorio_anexado_por_engano_pode_ser_removido(client, habilitacao, crm):
+    client.force_login(crm)
+    parecer = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=crm)
+    relatorio = _anexar_relatorio(parecer, crm)
+
+    client.post(reverse("credito:remover_relatorio", args=[habilitacao.pk, relatorio.pk]))
+
+    assert not parecer.tem_relatorio
+
+
+def test_relatorio_de_parecer_concluido_nao_sai(client, habilitacao, crm):
+    """Ele já sustentou o veredito que validou o perfil (AGENTS.md §6)."""
+    client.force_login(crm)
+    parecer = _concluir(habilitacao, crm)
+    relatorio = parecer.relatorios.first()
+
+    client.post(reverse("credito:remover_relatorio", args=[habilitacao.pk, relatorio.pk]))
+
+    assert parecer.relatorios.filter(pk=relatorio.pk).exists()
 
 
 def test_conclusao_valida_o_perfil(habilitacao, crm):

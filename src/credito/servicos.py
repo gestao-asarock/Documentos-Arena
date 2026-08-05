@@ -22,7 +22,7 @@ PAPEIS_DE_CREDITO = {Papel.CRM, Papel.ADMINISTRADOR}
 
 
 class ParecerIncompleto(Exception):
-    """Falta veredito ou justificativa para concluir."""
+    """Falta o relatório ou o veredito para concluir."""
 
 
 def pode_analisar(usuario) -> bool:
@@ -56,12 +56,14 @@ def obter_ou_criar_parecer_do_perfil(habilitacao: Habilitacao, *, usuario=None) 
 def concluir_parecer_do_perfil(parecer: ParecerCredito, habilitacao: Habilitacao, *, usuario):
     """Fecha o crédito do perfil e valida a contraparte.
 
-    Última etapa da esteira do perfil: daqui em diante ela pode contratar.
+    Última etapa da esteira do perfil: daqui em diante ela pode contratar. Como
+    no compliance (D50), o relatório é obrigatório e a justificativa é opcional:
+    é o documento anexado que sustenta o veredito.
     """
+    if not parecer.tem_relatorio:
+        raise ParecerIncompleto("Anexe o relatório da análise de crédito antes de dar o veredito.")
     if not parecer.veredito:
         raise ParecerIncompleto("Escolha o veredito de risco para concluir.")
-    if not parecer.justificativa.strip():
-        raise ParecerIncompleto("Justifique o veredito para concluir.")
 
     parecer.status = StatusParecer.CONCLUIDO
     parecer.analista = parecer.analista or usuario

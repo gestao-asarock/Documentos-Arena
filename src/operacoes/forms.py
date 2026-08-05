@@ -1,11 +1,13 @@
 """Formulários de operação. Validação de domínio fica no modelo/serviço."""
 
+from decimal import Decimal
+
 from django import forms
 
 from contrapartes.models import Contraparte, StatusHabilitacao
 from documentos.models import SubtipoDocumento, TipoDocumento
 from documentos.validadores import ACCEPT_HTML_COM_DOCX, validar_documento
-from solicitacoes.campos import DataBRField, MultiploArquivoField
+from solicitacoes.campos import DataBRField, MoedaBRField, MultiploArquivoField
 
 from .models import TipoOperacao
 
@@ -39,13 +41,12 @@ class OperacaoForm(forms.Form):
         ),
         input_formats=["%H:%M", "%H:%M:%S"],
     )
-    valor_total = forms.DecimalField(
+    valor_total = MoedaBRField(
         label="Valor (R$)",
         max_digits=14,
         decimal_places=2,
-        min_value=0.01,
+        min_value=Decimal("0.01"),
         help_text="Define o enquadramento e os documentos exigidos.",
-        widget=forms.NumberInput(attrs={"step": "0.01", "placeholder": "0,00"}),
     )
 
     def __init__(self, *args, **kwargs):
@@ -77,6 +78,12 @@ class EnvioDocumentoContratoForm(forms.Form):
 
     O arquivo é guardado **no perfil** da contraparte, não no contrato: assim
     outro contrato do mesmo tipo pode reaproveitá-lo (AGENTS.md D29).
+
+    **Sem data de emissão, ao contrário do kit cadastral (D48).** Lá a data
+    define até quando o documento vale, e um comprovante de endereço vencido
+    precisa ser flagrado. Documento de contrato nasce agora, para este contrato:
+    a emissão é sempre hoje e não alimenta cálculo nenhum. A vigência que
+    interessa é a do contrato, decidida na revisão jurídica.
     """
 
     tipo = forms.ModelChoiceField(queryset=TipoDocumento.objects.none(), label="Documento")
@@ -86,11 +93,8 @@ class EnvioDocumentoContratoForm(forms.Form):
         required=False,
     )
     arquivos = MultiploArquivoField(label="Arquivos", help_text="PDF, JPG ou PNG, até 25 MB cada.")
-    data_emissao = DataBRField(
-        label="Data de emissão", required=False, help_text="Usada para calcular a validade."
-    )
 
-    CAMPOS_CONDICIONAIS = ("subtipo", "data_emissao")
+    CAMPOS_CONDICIONAIS = ("subtipo",)
 
     def __init__(self, *args, operacao=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -110,9 +114,7 @@ class EnvioDocumentoContratoForm(forms.Form):
         self.tipos_com_subtipo = [
             tipo.id for tipo in pendentes if tipo.subtipos.filter(ativo=True).exists()
         ]
-        self.tipos_com_emissao = [tipo.id for tipo in pendentes if tipo.exige_data_emissao]
         self.fields["subtipo"].widget.attrs["data-depende-de"] = "identificacao"
-        self.fields["data_emissao"].widget.attrs["data-depende-de"] = "emissao"
         self.fields["tipo"].widget.attrs["data-controla-campos"] = "true"
 
     def clean_arquivos(self) -> list:
@@ -129,8 +131,6 @@ class EnvioDocumentoContratoForm(forms.Form):
 
         if tipo.subtipos.filter(ativo=True).exists() and dados.get("subtipo") is None:
             self.add_error("subtipo", "Informe qual documento está sendo enviado.")
-        if not tipo.exige_data_emissao:
-            dados["data_emissao"] = None
         return dados
 
 

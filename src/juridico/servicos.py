@@ -25,8 +25,11 @@ def pode_revisar(usuario) -> bool:
 def fila_juridica():
     """Contratos aguardando revisão jurídica, prontos para decidir.
 
-    Só entram os que têm a documentação aprovada: revisar contrato que ainda não
-    chegou é o defeito que a linearidade do fluxo evita (AGENTS.md §4.7).
+    Basta a documentação ter **chegado**: conferir o Termo de Adesão é o trabalho
+    desta etapa. Enquanto se exigia documento já aprovado, o contrato sumia da
+    fila esperando uma triagem que ninguém tinha para fazer, e o Jurídico via
+    "aguardando conferência" sem ter como conferir. O que a linearidade impede é
+    revisar contrato **inexistente** — e isso `documentacao_entregue` garante.
     """
     candidatos = (
         Operacao.objects.filter(etapas__etapa=Etapa.JURIDICO, etapas__status=StatusEtapa.PENDENTE)
@@ -39,7 +42,7 @@ def fila_juridica():
     return [
         operacao
         for operacao in candidatos
-        if operacao.documentacao_completa and operacao.etapa_atual.etapa == Etapa.JURIDICO
+        if operacao.documentacao_entregue and operacao.etapa_atual.etapa == Etapa.JURIDICO
     ]
 
 
@@ -47,8 +50,9 @@ def aguardando_documentacao():
     """Contratos que virão ao Jurídico, com o motivo de ainda não estarem prontos.
 
     Ficam à vista para o Jurídico saber o que vem — sem ação possível ainda. O
-    motivo importa: "falta o Clube enviar" e "enviado, esperando conferência"
-    são situações diferentes, e dizer só "aguardando documentos" confunde.
+    motivo importa: "falta o Clube enviar" e "documento recusado, esperando
+    reenvio" são situações diferentes, e dizer só "aguardando documentos"
+    confunde. Documento **enviado** já não cai aqui: vai para a fila de revisão.
     """
     candidatos = (
         Operacao.objects.filter(etapas__etapa=Etapa.JURIDICO, etapas__status=StatusEtapa.PENDENTE)
@@ -61,7 +65,7 @@ def aguardando_documentacao():
 
     pendentes = []
     for operacao in candidatos:
-        if operacao.documentacao_completa:
+        if operacao.documentacao_entregue:
             continue
 
         # Recalcula antes de mostrar: o status gravado pode ter ficado para trás
@@ -71,8 +75,6 @@ def aguardando_documentacao():
         situacao = operacao.situacao_documental()
         if situacao["com_problema"]:
             operacao.motivo_da_espera = "Documento recusado, aguardando reenvio"
-        elif situacao["em_analise"] and not situacao["faltando"]:
-            operacao.motivo_da_espera = "Documento enviado, em conferência"
         else:
             operacao.motivo_da_espera = "Aguardando o Clube enviar os documentos"
         pendentes.append(operacao)

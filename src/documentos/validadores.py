@@ -28,6 +28,7 @@ ASSINATURAS = {
 #: Aceito pelo atributo `accept` do campo de upload, no navegador.
 ACCEPT_HTML = ".pdf,.jpg,.jpeg,.png"
 ACCEPT_HTML_COM_DOCX = ACCEPT_HTML + ",.docx"
+ACCEPT_HTML_SO_PDF = ".pdf"
 
 
 def validar_extensao(arquivo, *, aceitar_docx: bool = False) -> None:
@@ -93,3 +94,18 @@ def validar_documento(arquivo, *, aceitar_docx: bool = False) -> str:
     validar_extensao(arquivo, aceitar_docx=aceitar_docx)
     validar_tamanho(arquivo)
     return validar_conteudo(arquivo, aceitar_docx=aceitar_docx)
+
+
+def validar_pdf(arquivo) -> str:
+    """Só PDF, mesmo limite de tamanho.
+
+    O relatório de due diligence é documento fechado, não print de tela: aceitar
+    imagem aqui só produziria evidência solta.
+    """
+    nome = (getattr(arquivo, "name", "") or "").lower()
+    if not nome.endswith(".pdf"):
+        raise ValidationError("Formato não aceito. Envie PDF.")
+    validar_tamanho(arquivo)
+    if validar_conteudo(arquivo) != "pdf":
+        raise ValidationError("O conteúdo do arquivo não corresponde a um PDF válido.")
+    return "pdf"

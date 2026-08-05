@@ -70,6 +70,9 @@ TRANSICOES = {
     StatusOperacao.EM_APROVACAO: {
         StatusOperacao.AGUARDANDO_ASSINATURA,
         StatusOperacao.CONCLUIDA,
+        # O contrato entra em aprovação com o documento apenas enviado, porque é
+        # a revisão jurídica que o confere. Se ela o recusar, ele volta ao envio.
+        StatusOperacao.AGUARDANDO_DOCUMENTOS,
     },
     StatusOperacao.AGUARDANDO_ASSINATURA: {StatusOperacao.ASSINADA},
     StatusOperacao.ASSINADA: {StatusOperacao.CONCLUIDA},

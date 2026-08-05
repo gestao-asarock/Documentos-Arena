@@ -238,11 +238,17 @@ a:hover { text-decoration-thickness: 2px; }
  * Numa lista de etapas, o olho procura uma coisa só: qual é a da vez. Ela
  * recebe faixa e fundo; o que já passou fica sóbrio, e o que ainda não chegou
  * fica apagado, para não competir.
+ *
+ * O destaque é **neutro**, de propósito. As cinco cores de estado dizem uma
+ * coisa só (D45), e azul ali quer dizer "em andamento" — que é justamente o que
+ * a pastilha da linha já diz. Pintar a linha inteira de azul repetia o recado e
+ * fazia a etapa da vez parecer um sexto estado. Aqui o realce é estrutural, o
+ * mesmo cinza do `:hover` da lista: "é esta a linha", não "é este o status".
  */
 .tabela tr.linha--atual > td {
-  background: var(--cor-andamento-fundo);
+  background: var(--cor-selecao);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--cor-andamento);
+  box-shadow: inset 3px 0 0 var(--cor-primaria);
 }
 .tabela tr.linha--futura > td { color: var(--cor-texto-suave); }
 /* Conferência: o valor registrado precisa saltar aos olhos para comparar. */
@@ -250,6 +256,26 @@ a:hover { text-decoration-thickness: 2px; }
 .tabela--conferencia td strong { font-size: 15px; }
 /* Aqui a caixa é o gesto principal da tela: um pouco maior que o padrão. */
 .tabela--conferencia input[type="checkbox"] { width: 20px; height: 20px; }
+/*
+ * O alvo do clique é a célula inteira, não os 20px da caixa. A margem negativa
+ * cancela o `padding` do `td` para o rótulo encostar nas bordas; quem confere
+ * campo a campo passa a mira pela coluna e clica sem precisar de pontaria.
+ */
+.tabela--conferencia td.celula-confere { padding: 0; }
+.confere {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+  min-height: 44px;
+  padding: var(--esp-2) var(--esp-3);
+  cursor: pointer;
+  user-select: none;
+}
+.confere:hover { background: var(--cor-selecao); }
+.confere:has(:focus-visible) { outline: 2px solid var(--cor-primaria); outline-offset: -2px; }
+.confere__rotulo { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.confere:has(:checked) .confere__rotulo { color: var(--cor-sucesso); font-weight: 500; }
 
 .dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--esp-3); margin: 0; }
 .dados dt { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
@@ -385,7 +411,38 @@ a:hover { text-decoration-thickness: 2px; }
   outline-offset: -1px;
   border-color: var(--cor-primaria);
 }
-.formulario input[type="file"] { padding: var(--esp-2); }
+/*
+ * Campo de arquivo. O botão nativo do navegador ("Escolher arquivos") vem cru,
+ * cinza-sistema, e destoava de todo o resto da tela. `::file-selector-button` o
+ * veste como `.botao--discreto` sem trocar o input por um controle de JS: o
+ * campo continua nativo, acessível e navegável por teclado.
+ */
+.formulario input[type="file"] {
+  padding: var(--esp-2);
+  align-items: center;
+  cursor: pointer;
+  color: var(--cor-texto-suave);
+}
+.formulario input[type="file"]::file-selector-button {
+  margin-right: var(--esp-3);
+  min-height: 32px;
+  padding: var(--esp-1) var(--esp-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.formulario input[type="file"]:hover::file-selector-button {
+  background: var(--cor-selecao);
+  border-color: var(--cor-primaria);
+}
+.formulario input[type="file"]:focus-visible::file-selector-button {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 1px;
+}
 
 /*
  * Caixa de marcação não é campo de texto. A regra acima dava a ela 42px de
@@ -573,6 +630,11 @@ input[type="radio"] {
   color: var(--cor-texto-suave);
 }
 .checagem__corpo ul { margin: var(--esp-2) 0 0; padding-left: var(--esp-4); }
+/* O que a área escreveu, em corpo de texto: é o parecer, não um item de lista. */
+.checagem__observacao { margin: var(--esp-2) 0 0; color: var(--cor-texto); }
+/* Relatório baixável não é marcador de lista: reusa o item do kit. */
+.checagem__corpo .lista-kit { margin: var(--esp-3) 0 0; padding-left: 0; }
+.checagem__corpo .lista-kit__item { margin-bottom: var(--esp-2); }
 .checagem--pendente { opacity: 0.8; }
 .checagem--externa { opacity: 0.6; }
 .checagem--atencao { border-color: var(--cor-atencao); }

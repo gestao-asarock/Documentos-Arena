@@ -11,11 +11,13 @@ from decimal import Decimal
 import pytest
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.urls import reverse
+from django.utils import timezone
 
 from analise.servicos import aprovar_documento, rejeitar_documento
 from contas.models import Papel, Usuario
-from contrapartes.models import ArquivoDocumento, DocumentoCadastral
-from operacoes.dossie import ATENCAO, CONCLUIDA, EXTERNA, PENDENTE, montar
+from contrapartes.models import ArquivoDocumento, DocumentoCadastral, Habilitacao
+from operacoes.dossie import ATENCAO, CONCLUIDA, EXTERNA, montar
 from operacoes.estados import Etapa
 from operacoes.models import Operacao, TipoOperacao
 from operacoes.servicos import decidir_etapa, enquadrar
@@ -89,14 +91,33 @@ def test_etapas_da_genial_nao_sao_concluidas(contrato):
             assert checagem.situacao == EXTERNA
 
 
-def test_documento_enviado_nao_diz_que_falta(contrato, crm):
+def test_documento_enviado_ja_conclui_a_checagem(contrato, crm):
+    """Enviar cumpre a parte do Clube; conferir é da revisão jurídica."""
     _enviar(contrato, crm)
 
     documentos = _por_titulo(contrato)["Documentos do contrato"]
 
-    assert documentos.situacao == PENDENTE
-    assert documentos.detalhe == "Enviado, aguardando conferência."
+    assert documentos.situacao == CONCLUIDA
+    assert "revisão jurídica" in documentos.detalhe
     assert "não enviado" not in " ".join(documentos.itens)
+
+
+def test_documento_enviado_mostra_quem_enviou_e_quando(contrato, crm):
+    documento = _enviar(contrato, crm)
+
+    documentos = _por_titulo(contrato)["Documentos do contrato"]
+
+    assert documentos.responsavel == str(crm)
+    assert documentos.data == documento.data_envio
+
+
+def test_enviar_nao_libera_a_assinatura(contrato, crm):
+    """A checagem fica verde, mas o contrato só sai depois do jurídico (D33)."""
+    from operacoes.dossie import pronto_para_assinatura
+
+    _enviar(contrato, crm)
+
+    assert not pronto_para_assinatura(contrato)
 
 
 def test_documento_faltando_diz_que_falta(contrato):
@@ -124,6 +145,79 @@ def test_documento_aprovado_conclui_a_checagem(contrato, crm):
     documentos = _por_titulo(contrato)["Documentos do contrato"]
 
     assert documentos.situacao == CONCLUIDA
+
+
+def _parecer_de_compliance(contrato, crm):
+    """Due diligence concluída, com relatório anexado (AGENTS.md D50)."""
+    from compliance.models import ParecerCompliance, RelatorioParecer, StatusParecer, Veredito
+
+    parecer = ParecerCompliance.objects.create(
+        habilitacao=contrato.contraparte.habilitacao_vigente,
+        status=StatusParecer.CONCLUIDO,
+        veredito=Veredito.BAIXO,
+        justificativa="Nada consta nas fontes consultadas.",
+        analista=crm,
+        data_conclusao=timezone.now(),
+    )
+    relatorio = RelatorioParecer.objects.create(
+        parecer=parecer,
+        arquivo=SimpleUploadedFile("dd.pdf", PDF),
+        nome_original="dd.pdf",
+        descricao="Consulta às listas restritivas",
+    )
+    return parecer, relatorio
+
+
+def test_dossie_traz_a_justificativa_e_o_relatorio_do_compliance(contrato, crm):
+    """Quem assina precisa ler o parecer inteiro, não só o veredito."""
+    _, relatorio = _parecer_de_compliance(contrato, crm)
+
+    checagem = _por_titulo(contrato)["Due diligence (Compliance)"]
+
+    assert checagem.observacao == "Nada consta nas fontes consultadas."
+    assert [a.titulo for a in checagem.anexos] == ["dd.pdf"]
+    assert checagem.anexos[0].descricao == "Consulta às listas restritivas"
+    assert str(relatorio.pk) in checagem.anexos[0].url
+
+
+def test_relatorio_do_dossie_e_baixavel(client, contrato, crm):
+    _, relatorio = _parecer_de_compliance(contrato, crm)
+    client.force_login(crm)
+
+    resposta = client.get(
+        reverse("operacoes:baixar_relatorio", args=[contrato.pk, "compliance", relatorio.pk])
+    )
+
+    assert resposta.status_code == 200
+    assert b"".join(resposta.streaming_content) == PDF
+
+
+def test_relatorio_de_outra_contraparte_nao_vaza(
+    client, contrato, crm, contraparte_sem_habilitacao
+):
+    """Trocar o id na URL não pode entregar o parecer de outra pessoa."""
+    from compliance.models import ParecerCompliance, RelatorioParecer
+
+    outra = Habilitacao.objects.create(contraparte=contraparte_sem_habilitacao)
+    alheio = RelatorioParecer.objects.create(
+        parecer=ParecerCompliance.objects.create(habilitacao=outra),
+        arquivo=SimpleUploadedFile("alheio.pdf", PDF),
+    )
+    client.force_login(crm)
+
+    resposta = client.get(
+        reverse("operacoes:baixar_relatorio", args=[contrato.pk, "compliance", alheio.pk])
+    )
+
+    assert resposta.status_code == 404
+
+
+def test_origem_desconhecida_e_recusada(client, contrato, crm):
+    client.force_login(crm)
+
+    resposta = client.get(reverse("operacoes:baixar_relatorio", args=[contrato.pk, "inventada", 1]))
+
+    assert resposta.status_code == 403
 
 
 def test_juridico_decidido_aparece_concluido(contrato, crm):

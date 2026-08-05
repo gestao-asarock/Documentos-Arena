@@ -374,31 +374,33 @@ Duas saídas para a pendência, e o sistema precisa distinguir as duas na audito
 ### 4.7 Due diligence de compliance (Fase 1, etapa 6)
 
 **No MVP a análise é manual.** O sistema entrega ao analista os dados e os documentos
-baixáveis, e coleta um parecer estruturado com evidências (prints anexados). A integração
-com a Trillia entra depois, se e quando for contratada (§5.2, §7 D22).
+baixáveis, e coleta **o relatório da análise em PDF** mais o veredito de risco. A
+integração com a Trillia entra depois, se e quando for contratada (§5.2, §7 D22).
 
-O parecer tem campos próprios, não um campo de texto livre único — assim vira dado
-auditável e comparável:
+A tela do parecer tem duas partes, nesta ordem: **Relatório** (um ou mais PDFs) e
+**Conclusão** (veredito obrigatório, justificativa opcional). Ver D50.
 
-| Bloco | O que registra |
+O que o relatório precisa cobrir — é conteúdo do documento, não campo de tela:
+
+| Frente | O que a análise precisa apurar |
 |---|---|
 | Situação cadastral | CPF regular / CNPJ ativo; para PJ, CNAE compatível com o que está sendo contratado |
 | Processos | judiciais e administrativos, separados por esfera: cível, criminal, trabalhista, fiscal e execuções |
 | Sanções e listas restritivas | ONU, OFAC, União Europeia; e as nacionais: CEIS, CNEP, CEPIM, inidôneos do TCU, "lista suja" do trabalho escravo, CADIN |
-| PEP | pessoa exposta politicamente — o titular, sócios, administradores, beneficiário final **e** familiares/relacionados próximos |
+| PEP | pessoa exposta politicamente: o titular, sócios, administradores, beneficiário final **e** familiares/relacionados próximos |
 | Bloqueios e restrições | indisponibilidade de bens, restrições cadastrais |
 | Mídia adversa (webcheck) | busca por palavras-chave (fraude, lavagem, corrupção, crime ambiental...) com registro dos termos usados e do que foi encontrado |
 | Beneficiário final e grupo econômico | para PJ: quem controla de fato, e o grupo ao qual pertence |
 | Sócios | as mesmas checagens acima replicadas nos sócios relevantes, quando PJ |
-| Parte relacionada | vínculo com o Fundo, o Clube ou a gestora — conflito de interesse |
-| **Veredito** | **risco baixo, moderado ou alto**, com justificativa obrigatória |
+| Parte relacionada | vínculo com o Fundo, o Clube ou a gestora, conflito de interesse |
 
 Notas de implementação:
 
 - O veredito é **humano e obrigatório**. Sem veredito não há habilitação.
+- **Sem relatório anexado não há veredito**: a conclusão é recusada (D50).
 - Risco alto não bloqueia automaticamente: escala a decisão. Quem pode liberar apesar de
   risco alto é regra de governança — **pergunte, não invente** (§10).
-- Cada bloco aceita evidência anexada (print, PDF), e todos ficam versionados na auditoria.
+- Os relatórios ficam presos ao parecer e a conclusão fica versionada na auditoria.
 - Prazo de validade da análise: campo no modelo, **valor a definir com o compliance**
   (§7, D19). A praxe de mercado é 12 meses, com reavaliação por evento — mudança
   societária, por exemplo.
@@ -407,9 +409,14 @@ Notas de implementação:
 
 ### 4.8 Análise de crédito (Fase 1, etapa 7)
 
-Mesmo formato do compliance: análise manual, parecer estruturado, veredito de risco
-(baixo/moderado/alto). Fonte prevista é o **Serasa**, ainda não confirmada, e a etapa só
-existe **quando a matriz do guia a exige** para aquele enquadramento (§4.4).
+Mesmo formato do compliance, inclusive na tela (D50): análise manual, **relatório em PDF**
+obrigatório, veredito de risco (baixo/moderado/alto) e justificativa opcional. Fonte
+prevista é o **Serasa**, ainda não confirmada, e a etapa só existe **quando a matriz do
+guia a exige** para aquele enquadramento (§4.4).
+
+O que o relatório precisa apurar: consulta de crédito (score e fonte), restrições,
+protestos e negativações, pendências financeiras, capacidade de pagamento e — só para PJ,
+onde o enquadramento exigir — balanço, DRE e faturamento.
 
 Roda **depois** do compliance, não em paralelo: não se gasta análise de crédito em quem
 vai ser barrado antes (§7, D23).
@@ -485,8 +492,8 @@ Clube cumpre ao baixar, assinar e devolver.
   cadastral e da habilitação, reutilizada entre contratos.
 - **`Habilitacao`** — o resultado da Fase 1 para uma contraparte: pareceres de compliance
   e de crédito, veredito de risco, quem conferiu, data e validade.
-- **`ParecerCompliance`** / **`ParecerCredito`** — os blocos estruturados de §4.7 e §4.8,
-  com evidências anexadas e veredito de risco.
+- **`ParecerCompliance`** / **`ParecerCredito`** — o relatório em PDF (`RelatorioParecer` e
+  `RelatorioCredito`) mais o veredito de risco, nas duas etapas (§4.7, §4.8, D50).
 - **`Solicitacao`** — o formulário inicial do Clube: dados do evento/serviço, dados do
   contratante e valor. É o que dispara a Fase 1.
 - **`DocumentoCadastral`** — documento do kit, pertence à contraparte, com data de
@@ -782,7 +789,10 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   do prazo é aceito**, com alerta forte no envio e na tela: barrar deixaria o Clube sem
   caminho, e quem decide se aceita assim mesmo é a triagem. O prazo vem de
   `TipoDocumento.dias_validade` (90 dias para comprovante de residência) — **nunca escreva
-  90 no código**.
+  90 no código**. **Isto vale para o kit cadastral, não para o documento de contrato**
+  (ajuste de 05/08/2026): o documento do contrato nasce agora, para este contrato, então a
+  emissão é sempre hoje e não alimenta cálculo nenhum. `EnvioDocumentoContratoForm` não tem
+  o campo; a vigência que interessa ali é a do contrato, decidida na revisão jurídica.
 - **D49 — Travessão e ponto médio não entram na interface.** Decisão de 04/08/2026.
   Nada de `—` nem de `·` em texto que chega à tela: título, rótulo, `help_text`, `__str__`,
   mensagem, nome de tipo em tabela. Use pontuação comum, que diz o mesmo: dois pontos para
@@ -791,6 +801,48 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   (`-`). Docstring e comentário ficam de fora: são texto para quem lê o código.
   `tests/test_templates.py` varre os templates e, pelo `ast`, as strings do Python que não
   são docstring — o que passa a valer também para o código que ainda não existe.
+- **D53 — Aprovar a revisão jurídica exige conferir todos os campos.** Decisão de
+  05/08/2026. As caixas do "o que conferir" eram enfeite: não iam no formulário e ninguém
+  as validava, então dava para aprovar sem olhar campo nenhum — e a tela ainda dizia que
+  elas "não são salvas". Agora vão como `confere=<chave>` e o **servidor** recusa a
+  aprovação enquanto faltar alguma, nomeando o que falta. Cada `CampoConferencia` tem
+  `chave` própria (não índice: a lista muda de tamanho conforme a operação tem data,
+  horário ou RG). **Reprovar não exige marcação alguma** — reprova-se justamente porque um
+  campo não confere. As marcações não são persistidas: elas provam o gesto no momento da
+  decisão, e o que fica registrado é o parecer.
+- **D52 — Cada área decide no posto de trabalho dela, não na tela da operação.** Decisão de
+  05/08/2026. A revisão jurídica ganhou tela própria (`/juridico/<id>/`), no molde da
+  triagem do CRM: o documento baixável ao lado dos campos a conferir, e o parecer logo
+  abaixo. A tela da operação é **painel de acompanhamento** — mostra onde o contrato está e
+  aponta o caminho ("Abrir revisão jurídica"), mas não decide por ninguém. O formulário
+  genérico de decisão continua ali para as etapas que ainda não têm tela própria; quando
+  ganharem, saem de lá também. Download do arquivo confere que ele é **daquele contrato** e
+  vai para a auditoria (§5.4, §6).
+- **D51 — O documento do contrato não passa por triagem: quem o confere é a revisão
+  jurídica.** Decisão de 05/08/2026, a partir de um impasse real. As etapas do contrato
+  exigiam documentação **aprovada** para poder ser decididas, mas nenhuma área tinha a
+  atribuição de aprovar o Termo de Adesão: a triagem (etapa 1) chega cumprida da
+  habilitação, e a conferência do termo é literalmente o trabalho da etapa 4. O contrato
+  travava dizendo "aguardando conferência" para todo mundo, inclusive jurídico e
+  administrador, e sumia da `fila_juridica`. Agora o que destrava as etapas é
+  `Operacao.documentacao_entregue` (nada faltando, nada recusado), e **aprovar a revisão
+  jurídica aprova os documentos que ela acabou de conferir** — sem isso eles ficariam
+  "enviados" para sempre e a assinatura, que exige `documentacao_completa`, nunca abriria.
+  Recusar devolve o contrato para `AGUARDANDO_DOCUMENTOS`. O que a linearidade impede
+  continua valendo: revisar contrato **inexistente** (§4.7, §4.9).
+- **D50 — A due diligence é o relatório, não um formulário de nove campos.** Decisão de
+  05/08/2026. O analista já produz o relatório fora daqui; redigitá-lo bloco a bloco na
+  tela não acrescentava dado nenhum e alongava a página. Saíram os nove campos de
+  "Verificações" e o "Termos pesquisados"; a **justificativa virou opcional**, porque o
+  documento anexado já sustenta o veredito. O que entrou: **Relatório**, um ou mais PDFs
+  (só PDF — print de tela não é relatório), **acima** da Conclusão na tela, sem campo
+  "Bloco". **Sem pelo menos um relatório anexado, `concluir_parecer` recusa o veredito** —
+  decisão sem lastro documental não fecha. **O crédito (§4.8) seguiu o mesmo desenho** em
+  05/08/2026: saíram os cinco blocos e a caixa "registrado em nome do time" (sempre
+  verdadeira enquanto Risco não for usuário — D9; o campo continua no modelo). Relatório
+  anexado por engano se remove enquanto o parecer é rascunho; concluído, não sai, porque
+  virou o lastro do veredito (§6). Migrations `compliance/0002` e `credito/0004` apagam as
+  colunas de texto: reverter recria os campos vazios.
 - **D1 — Django em vez de FastAPI.** O Django Admin dá ao jurídico e ao compliance uma
   interface de revisão sem que a construamos, e permite editar a tabela de regras.
   Preserve isso: mantenha os modelos registrados e utilizáveis no Admin.

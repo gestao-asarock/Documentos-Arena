@@ -385,7 +385,20 @@ class Operacao(models.Model):
 
     @property
     def documentacao_completa(self) -> bool:
+        """Tudo aprovado e vigente. É o que libera o contrato para assinatura."""
         return not self.documentos_pendentes()
+
+    @property
+    def documentacao_entregue(self) -> bool:
+        """Nada faltando e nada recusado: há o que analisar.
+
+        Diferente de `documentacao_completa`, que exige aprovação. É esta que
+        libera as **etapas** do contrato: quem confere o Termo de Adesão é a
+        revisão jurídica, e exigir uma triagem antes dela pedia a mesma
+        conferência duas vezes, de duas áreas (AGENTS.md §4.9).
+        """
+        situacao = self.situacao_documental()
+        return not situacao["faltando"] and not situacao["com_problema"]
 
 
 class EtapaAprovacao(models.Model):

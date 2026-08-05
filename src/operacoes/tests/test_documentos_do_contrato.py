@@ -60,9 +60,25 @@ def _enviar(client, operacao, tipo):
             # O tipo tem subtipos: é preciso dizer qual peça está sendo enviada.
             "subtipo": tipo.subtipos.get(nome="Termo de Adesão (preenchido)").id,
             "arquivos": [SimpleUploadedFile("termo.pdf", PDF)],
-            "data_emissao": "",
         },
     )
+
+
+def test_envio_do_contrato_nao_pede_data_de_emissao(client, criar_contrato, crm):
+    """Documento de contrato nasce agora: a emissão não alimenta cálculo nenhum.
+
+    Diferente do kit cadastral (D48), onde a data define a vigência do dossiê.
+    """
+    client.force_login(crm)
+    operacao = criar_contrato("2000.00")
+    tipo = operacao.documentos_exigidos()[0]
+
+    resposta = client.get(reverse("operacoes:detalhe", args=[operacao.pk]))
+    _enviar(client, operacao, tipo)
+    documento = operacao.contraparte.documentos_cadastrais.get(tipo=tipo)
+
+    assert "data_emissao" not in resposta.content.decode()
+    assert documento.data_emissao is None
 
 
 def test_contrato_nasce_aguardando_os_documentos_do_enquadramento(criar_contrato):

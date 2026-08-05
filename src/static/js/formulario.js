@@ -42,6 +42,19 @@
         .replace(/\.(\d{3})(\d)/, ".$1/$2")
         .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
     },
+    /*
+     * Dinheiro, da direita para a esquerda: o que se digita são centavos, e a
+     * vírgula anda sozinha. Digitar 123456 dá 1.234,56 — não há como esquecer
+     * a vírgula nem trocar a casa decimal de lugar.
+     */
+    moeda: function (valor) {
+      var d = apenasDigitos(valor).slice(0, 14);
+      if (!d) return "";
+      d = d.replace(/^0+(?=\d{3})/, "");
+      var centavos = d.padStart(3, "0");
+      var inteiros = centavos.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return inteiros + "," + centavos.slice(-2);
+    },
     telefone: function (valor) {
       var d = apenasDigitos(valor).slice(0, 11);
       if (d.length > 10) return "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7);

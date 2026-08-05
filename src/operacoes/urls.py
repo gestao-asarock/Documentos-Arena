@@ -18,4 +18,9 @@ urlpatterns = [
         views.baixar_para_assinatura,
         name="baixar_para_assinatura",
     ),
+    path(
+        "operacoes/<int:pk>/relatorios/<str:origem>/<int:relatorio_id>/",
+        views.baixar_relatorio,
+        name="baixar_relatorio",
+    ),
 ]

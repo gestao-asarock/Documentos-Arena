@@ -16,7 +16,7 @@ from django.urls import reverse
 
 from contas.models import Papel, Usuario
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
-from juridico.servicos import aguardando_documentacao
+from juridico.servicos import aguardando_documentacao, fila_juridica
 from operacoes.estados import StatusOperacao
 from operacoes.models import Operacao, TipoOperacao
 from operacoes.servicos import enquadrar
@@ -74,14 +74,13 @@ def test_estado_desatualizado_e_corrigido_ao_abrir(client, contrato_desatualizad
     client.get(reverse("operacoes:detalhe", args=[contrato_desatualizado.pk]))
     contrato_desatualizado.refresh_from_db()
 
-    assert contrato_desatualizado.status == StatusOperacao.EM_ANALISE_DOCUMENTAL
+    assert contrato_desatualizado.status == StatusOperacao.EM_APROVACAO
 
 
 def test_fila_do_juridico_nao_mostra_estado_velho(contrato_desatualizado):
-    esperando = aguardando_documentacao()
-
-    assert esperando[0].status == StatusOperacao.EM_ANALISE_DOCUMENTAL
-    assert esperando[0].motivo_da_espera == "Documento enviado, em conferência"
+    """Documento enviado sai da espera e vai para a fila de revisão."""
+    assert aguardando_documentacao() == []
+    assert contrato_desatualizado in fila_juridica()
 
 
 def test_comando_recalcula_sem_decidir_nada(contrato_desatualizado):
@@ -91,7 +90,7 @@ def test_comando_recalcula_sem_decidir_nada(contrato_desatualizado):
     call_command("recalcular_estados")
     contrato_desatualizado.refresh_from_db()
 
-    assert contrato_desatualizado.status == StatusOperacao.EM_ANALISE_DOCUMENTAL
+    assert contrato_desatualizado.status == StatusOperacao.EM_APROVACAO
     assert {e.etapa: e.status for e in contrato_desatualizado.etapas.all()} == etapas_antes
 
 

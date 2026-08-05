@@ -45,8 +45,24 @@
       </summary>
       <div class="checagem__corpo">
         {% if checagem.detalhe %}<p>{{ checagem.detalhe }}</p>{% endif %}
+        {% if checagem.observacao %}
+          <p class="checagem__observacao">{{ checagem.observacao|linebreaksbr }}</p>
+        {% endif %}
         {% if checagem.itens %}
           <ul>{% for item in checagem.itens %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if checagem.anexos %}
+          <ul class="lista-kit">
+            {% for anexo in checagem.anexos %}
+              <li class="lista-kit__item">
+                <span class="lista-kit__nome">
+                  {{ anexo.titulo }}
+                  {% if anexo.descricao %}<small class="ajuda">{{ anexo.descricao }}</small>{% endif %}
+                </span>
+                <a class="botao botao--discreto" href="{{ anexo.url }}">Baixar relatório</a>
+              </li>
+            {% endfor %}
+          </ul>
         {% endif %}
       </div>
     </details>

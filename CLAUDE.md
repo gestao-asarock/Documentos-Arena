@@ -181,11 +181,25 @@ os campos à mão. Campo de formulário agora sai do partial `src/templates/_cam
 > O formulário vai com `novalidate`: campo obrigatório escondido faz o navegador recusar o
 > envio sem mostrar nada. Quem aponta o que falta é o servidor.
 
+**Dinheiro na tela é campo de texto, nunca `type="number"`.** `MoedaBRField` em
+`solicitacoes/campos.py`, com a máscara `moeda` do `formulario.js`: digita-se da direita
+para a esquerda (123456 vira 1.234,56) e o servidor normaliza 1.234,56, 1234,56 e 1234.56.
+O `input[type=number]` traz as setinhas e, com elas, a roda do mouse: passar o cursor sobre
+o campo e rolar a página trocava o valor do contrato em silêncio.
+
 **Identidade visual do Clube, em cinza** (AGENTS.md D45, D46). Os neutros viraram grafite
 e quase-branco; as cinco cores de estado seguem intocadas e agora saltam mais. Link do
 corpo leva sublinhado, porque sem azul a cor não distingue mais link de texto. O brasão
 está no cabeçalho (pastilha branca, senão o contorno preto some no grafite) e grande na
 tela de login.
+
+> **Realce estrutural é cinza; cor é só estado.** A linha da etapa da vez
+> (`.linha--atual`) usa `--cor-selecao` e faixa grafite, não azul: as cinco cores de estado
+> dizem uma coisa só, e a pastilha da própria linha já diz "em andamento". Pintar a linha
+> de azul repetia o recado e parecia um sexto estado. A linha do tempo (`.fluxo`) segue
+> azul porque lá a cor **é** o status do passo, sem pastilha ao lado repetindo. O botão nativo do campo de arquivo é vestido por
+`input[type="file"]::file-selector-button` em `base.css`, com a cara de `.botao--discreto`
+— **não troque o input por um controle de JS** só para estilizá-lo.
 
 > **Os arquivos da marca são gerados, não editados.** O original entregue é um JPEG com o
 > quadriculado de transparência *desenhado nos pixels*. `docs/marca/gerar.py` recorta o
@@ -203,7 +217,9 @@ Serviços em `contrapartes/servicos.py`: `alterar_dados_cadastrais` e `reiniciar
 
 **Data de emissão obrigatória** onde o tipo a exige, e **alerta de prazo** quando o
 documento chega vencido — aceita, mas com aviso forte no envio e no kit (AGENTS.md D48).
-O prazo sai de `TipoDocumento.dias_validade`, nunca de constante no código.
+O prazo sai de `TipoDocumento.dias_validade`, nunca de constante no código. **Só no kit
+cadastral:** o envio de documento do contrato não pede a data, porque ali o documento nasce
+junto com o contrato e a emissão é sempre hoje.
 
 **Selo de validação some quando o perfil é cancelado**: vira "Cancelada" em cinza. Mostrar
 "Aguardando documentos" num cadastro encerrado sugeria que alguém ainda esperava algo. A
@@ -231,14 +247,32 @@ arquivos, e decisão aprovar/rejeitar. Rejeição exige motivo e o Clube o vê n
 Aprovar o último documento do kit leva a habilitação para `EM_COMPLIANCE`.
 
 **Due diligence funcionando** (app `compliance`): fila em `/compliance/` para `compliance` e
-`administrador`, parecer com os nove blocos de AGENTS.md §4.7, evidências anexadas por
-bloco, veredito de risco obrigatório com justificativa, e recusa da contraparte. Concluir
-leva a habilitação para `EM_CREDITO` ou direto para `HABILITADA`, conforme a matriz.
+`administrador`, **Relatório** (um ou mais PDFs) acima da **Conclusão** (veredito
+obrigatório, justificativa opcional), e recusa da contraparte. Concluir leva a habilitação
+para `EM_CREDITO` ou direto para `HABILITADA`, conforme a matriz.
 
-**Risco e crédito funcionando** (app `credito`): fila em `/credito/` para `crm`,
-`compliance` e `administrador` (o time de Risco não é usuário — D9), parecer com cinco
-blocos, evidências e veredito. Concluir **habilita a contraparte** e marca a solicitação
-como pronta para contrato — fim da Fase 1.
+> **Os nove blocos de "Verificações" saíram** (AGENTS.md D50, 05/08/2026). O relatório é o
+> parecer; a tela só coleta a decisão sobre ele. `concluir_parecer` recusa veredito sem
+> relatório anexado. `EvidenciaParecer` virou `RelatorioParecer` (`related_name`
+> `relatorios`), sem o campo `bloco`, e `documentos/validadores.validar_pdf` é o ponto
+> único do "só PDF". **O crédito recebeu o mesmo tratamento** (`RelatorioCredito`,
+> migration `credito/0004`), então as duas telas são gêmeas: mesmos formulários, mesmas
+> regras de conclusão, mesma remoção de relatório.
+
+**Relatório anexado por engano se remove** (`remover_relatorio`), enquanto o parecer está em
+rascunho: o arquivo sai do storage junto e a remoção fica na auditoria. Depois de concluído
+não sai — aquele PDF é o lastro do veredito que já correu para o crédito (AGENTS.md §6).
+Tirar o último relatório tranca a conclusão de novo, pela mesma regra de D50.
+
+**Risco e crédito funcionando** (app `credito`): fila em `/credito/` para `crm` e
+`administrador` (o time de Risco não é usuário — D9), com **a mesma tela do compliance**
+(D50): Relatório em PDF acima da Conclusão, veredito obrigatório, justificativa opcional,
+remoção de relatório enquanto é rascunho. Concluir **habilita a contraparte** e marca a
+solicitação como pronta para contrato — fim da Fase 1.
+
+> A tela de crédito **nunca chegou a renderizar** o formulário de evidências: a view
+> mandava `form_evidencia` para o template e o template não o usava, então o upload existia
+> só na URL. Corrigido junto com o D50.
 
 **Perfil × contrato separados** (AGENTS.md D29, D30): `Solicitacao` virou o **perfil** da
 contraparte (só documentos base, sem valor nem evento); `Operacao` carrega tipo, descrição,
@@ -247,6 +281,37 @@ acontece **uma vez, na esteira do perfil**; o contrato não a refaz (AGENTS.md D
 
 > **Dívida conhecida:** o app ainda se chama `solicitacoes`, mas hospeda os **perfis**.
 > Renomear para `perfis` quando houver um momento tranquilo — mexe em migrations.
+
+**Dossiê da tela de assinatura** (`operacoes/dossie.py`): os relatórios de compliance e de
+crédito são **baixáveis ali mesmo** (`operacoes:baixar_relatorio`, com a origem no caminho),
+e a justificativa de cada parecer aparece como texto. O acesso é governado pela visibilidade
+do **contrato**, não pelo papel da área: quem assina precisa poder ler o que sustenta a
+assinatura. A view confere que o relatório é da contraparte daquele contrato — sem isso,
+trocar o id na URL leria o parecer de outra pessoa — e registra o download na auditoria.
+
+**Revisão jurídica tem tela própria** (AGENTS.md D52): `/juridico/<id>/`, com os documentos
+baixáveis, os campos a conferir (`operacoes/conferencia.py`) e o parecer com aprovar/reprovar.
+A fila do Jurídico leva para lá; a tela da operação virou painel e só oferece o botão "Abrir
+revisão jurídica" para quem tem o papel. **Aprovar exige marcar todas as caixas de
+conferência** (D53), e quem recusa é o servidor, nomeando o que falta; reprovar não exige
+nenhuma. As marcações não são persistidas: o que fica é o parecer. O formulário genérico de decisão em
+`operacoes/detalhe.html` continua servindo as etapas sem tela própria.
+
+**Documento do contrato não tem triagem** (AGENTS.md D51): quem confere o Termo de Adesão é
+a revisão jurídica. Duas propriedades, e a diferença importa: `documentacao_entregue` (nada
+faltando, nada recusado) libera as **etapas** e a `fila_juridica`; `documentacao_completa`
+(tudo aprovado) libera a **assinatura**. Aprovar a etapa jurídica aprova os documentos que
+ela conferiu; reprovar devolve o contrato para `AGUARDANDO_DOCUMENTOS`.
+
+> **`StatusOperacao.EM_ANALISE_DOCUMENTAL` ficou sem uso para contratos.** O valor segue no
+> enum e nas transições, mas nada mais leva um contrato até lá: enviado já vai para
+> `EM_APROVACAO`. Não o reintroduza sem antes reler D51.
+
+> **"Documentos do contrato" fica concluída ao enviar**, não ao aprovar. A checagem responde
+> "o Clube fez a parte dele?"; conferir o conteúdo é da revisão jurídica, que aparece logo
+> abaixo como a etapa pendente. Dizer "pendente" com o documento já enviado cobrava duas
+> vezes a mesma coisa. **Isso não libera a assinatura:** `pronto_para_assinatura` continua
+> exigindo `documentacao_completa` e o jurídico decidido (D33).
 
 **Fase 1 e Fase 2 amarradas:** a operação (contrato) só nasce de uma solicitação com
 contraparte habilitada, e as etapas 1 a 3 chegam como `CUMPRIDA_NA_HABILITACAO`, trazendo

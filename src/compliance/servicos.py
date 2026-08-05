@@ -44,7 +44,7 @@ def obter_ou_criar_parecer(habilitacao: Habilitacao, *, usuario=None) -> Parecer
 
 
 class ParecerIncompleto(Exception):
-    """Falta veredito ou justificativa para concluir."""
+    """Falta o relatório ou o veredito para concluir."""
 
 
 @transaction.atomic
@@ -52,12 +52,14 @@ def concluir_parecer(parecer: ParecerCompliance, *, usuario) -> Habilitacao:
     """Fecha a due diligence e manda o perfil para a análise de crédito.
 
     O veredito é humano e obrigatório: sem ele o perfil não avança
-    (AGENTS.md §4.7).
+    (AGENTS.md §4.7). O relatório também: é ele que sustenta o veredito, e sem
+    documento anexado a decisão fica sem lastro auditável. A justificativa é
+    opcional — quem quiser explicar em texto, explica.
     """
+    if not parecer.tem_relatorio:
+        raise ParecerIncompleto("Anexe o relatório de due diligence antes de dar o veredito.")
     if not parecer.veredito:
         raise ParecerIncompleto("Escolha o veredito de risco para concluir.")
-    if not parecer.justificativa.strip():
-        raise ParecerIncompleto("Justifique o veredito para concluir.")
 
     parecer.status = StatusParecer.CONCLUIDO
     parecer.analista = parecer.analista or usuario

@@ -39,8 +39,8 @@
       </p>
     {% elif situacao.em_analise %}
       <p class="aviso aviso--info">
-        &#9679; Documentação do contrato enviada, <strong>aguardando conferência</strong>.
-        O contrato segue assim que for aprovada.
+        &#9679; Documentação do contrato enviada, <strong>aguardando a revisão jurídica</strong>,
+        que é quem confere o conteúdo.
       </p>
     {% endif %}
   {% endif %}
@@ -86,51 +86,40 @@
       Sem documentação o fluxo está parado: o destaque azul vai para o bloco de
       envio, e este fica em âmbar, sinalizando espera e não ação.
     {% endcomment %}
-    <div class="decisao{% if not documentacao_completa %} decisao--travada{% endif %}">
+    <div class="decisao{% if not documentacao_entregue %} decisao--travada{% endif %}">
       <h3 class="subtitulo">
-        {% if documentacao_completa %}Agora:{% else %}Parado em:{% endif %}
+        {% if documentacao_entregue %}Agora:{% else %}Parado em:{% endif %}
         {{ etapa_atual.get_etapa_display }}
       </h3>
-      {% if not documentacao_completa %}
+      {% if not documentacao_entregue %}
         <p class="aviso aviso--atencao">
-          {% if situacao.em_analise and not situacao.faltando %}
-            &#9679; Documento do contrato enviado, <strong>aguardando conferência</strong>.
-            Assim que for aprovado, o contrato segue para esta etapa.
-          {% else %}
-            &#9888; O fluxo está parado: faltam documentos do contrato.
-          {% endif %}
+          &#9888; O fluxo está parado: faltam documentos do contrato.
           <a href="#documentacao">Ver a situação</a>.
-        </p>
-      {% elif conferencia %}
-        <p class="ajuda">
-          Confira se o <strong>Termo de Adesão</strong> repete exatamente os dados abaixo.
-          O contrato-mãe é modelo base e não muda entre operações: a análise recai
-          sobre o termo.
-        </p>
-        <table class="tabela tabela--conferencia">
-          <thead>
-            <tr><th>Campo</th><th>Registrado na operação</th><th>Confere?</th></tr>
-          </thead>
-          <tbody>
-            {% for campo in conferencia %}
-              <tr>
-                <td>
-                  {{ campo.rotulo }}
-                  {% if campo.observacao %}<small class="ajuda">{{ campo.observacao }}</small>{% endif %}
-                </td>
-                <td><strong>{{ campo.valor }}</strong></td>
-                <td class="tabela__numero"><input type="checkbox" aria-label="Confere"></td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        <p class="ajuda">
-          Os quadradinhos são só apoio de leitura, não são salvos. O que vale é o
-          parecer abaixo, que vai para a auditoria com o seu nome.
         </p>
       {% endif %}
 
-      {% if na_assinatura %}
+      {% comment %}
+        A revisão jurídica tem posto de trabalho próprio (D52): esta tela é o painel
+        do contrato, não o lugar de decidir por uma área. Aqui fica só o caminho.
+      {% endcomment %}
+      {% if na_revisao_juridica %}
+        {% if pode_revisar %}
+          <p class="ajuda">
+            A conferência do Termo de Adesão acontece na tela do Jurídico, com o documento
+            baixável ao lado dos campos a comparar.
+          </p>
+          <p>
+            <a class="botao botao--grande" href="{% url 'juridico:revisar' operacao.pk %}">
+              Abrir revisão jurídica
+            </a>
+          </p>
+        {% else %}
+          <p class="vazio">
+            Etapa sob responsabilidade de <strong>{{ etapa_atual.papel_responsavel }}</strong>,
+            que confere o Termo de Adesão.
+          </p>
+        {% endif %}
+      {% elif na_assinatura %}
         <p class="ajuda">
           Esta etapa não se aprova por parecer: ela se cumpre <strong>baixando o
           contrato</strong> para coleta das assinaturas. O download registra quem
@@ -160,7 +149,7 @@
             <button type="submit" name="acao" value="reprovar" class="botao botao--perigo">Reprovar</button>
           </div>
         </form>
-      {% elif documentacao_completa %}
+      {% elif documentacao_entregue %}
         <p class="vazio">
           Etapa sob responsabilidade de <strong>{{ etapa_atual.papel_responsavel }}</strong>.
           Você não tem papel para decidi-la.
@@ -194,7 +183,7 @@
   {% endif %}
 
   {% if situacao.em_analise %}
-    <h3 class="subtitulo">Aguardando conferência</h3>
+    <h3 class="subtitulo">Aguardando a revisão jurídica</h3>
     <ul class="lista-kit">
       {% for documento in situacao.em_analise %}
         <li class="lista-kit__item">
@@ -208,8 +197,8 @@
       {% endfor %}
     </ul>
     <p class="ajuda">
-      Já enviado: falta a conferência documental. Enviar não é aprovar: o contrato só
-      avança depois da checagem.
+      Já enviado. Quem confere o conteúdo é a revisão jurídica: aprovar aquela etapa
+      aprova estes documentos e libera o contrato para assinatura.
     </p>
   {% endif %}
 

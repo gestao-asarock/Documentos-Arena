@@ -10,9 +10,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
+from auditoria.servicos import Acao, registrar
 from contrapartes.models import Habilitacao
 
-from .forms import EvidenciaCreditoForm, ParecerCreditoForm
+from .forms import ParecerCreditoForm, RelatorioCreditoForm
+from .models import RelatorioCredito
 from .servicos import (
     ParecerIncompleto,
     concluir_parecer_do_perfil,
@@ -74,14 +76,14 @@ def parecer_perfil(request, habilitacao_id: int):
             "contraparte": habilitacao.contraparte,
             "parecer": registro,
             "form": form,
-            "form_evidencia": EvidenciaCreditoForm(),
+            "form_relatorio": RelatorioCreditoForm(),
             "parecer_compliance": getattr(habilitacao, "parecer_compliance", None),
         },
     )
 
 
 @login_required
-def anexar_evidencia(request, habilitacao_id: int):
+def anexar_relatorio(request, habilitacao_id: int):
     _exigir_analista(request.user)
 
     if request.method != "POST":
@@ -90,19 +92,72 @@ def anexar_evidencia(request, habilitacao_id: int):
     habilitacao = get_object_or_404(Habilitacao, pk=habilitacao_id)
     registro = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=request.user)
 
-    form = EvidenciaCreditoForm(request.POST, request.FILES)
+    form = RelatorioCreditoForm(request.POST, request.FILES)
     if form.is_valid():
-        evidencia = form.save(commit=False)
-        evidencia.parecer = registro
-        evidencia.nome_original = evidencia.arquivo.name[:255]
-        evidencia.enviada_por = request.user
-        evidencia.save()
-        messages.success(request, "Evidência anexada.")
+        arquivos = form.cleaned_data["arquivos"]
+        descricao = form.cleaned_data["descricao"]
+        RelatorioCredito.objects.bulk_create(
+            [
+                RelatorioCredito(
+                    parecer=registro,
+                    arquivo=arquivo,
+                    nome_original=arquivo.name[:255],
+                    descricao=descricao,
+                    enviada_por=request.user,
+                )
+                for arquivo in arquivos
+            ]
+        )
+        messages.success(
+            request,
+            f"{len(arquivos)} relatório{'s' if len(arquivos) != 1 else ''} anexado"
+            f"{'s' if len(arquivos) != 1 else ''}.",
+        )
     else:
         for erros in form.errors.values():
             for erro in erros:
                 messages.error(request, erro)
 
+    return redirect("credito:parecer_perfil", habilitacao_id=habilitacao_id)
+
+
+@login_required
+def remover_relatorio(request, habilitacao_id: int, relatorio_id: int):
+    """Tira um relatório anexado por engano, antes de o parecer fechar.
+
+    Depois de concluído não se mexe: aquele arquivo é o lastro do veredito que
+    validou o perfil (AGENTS.md §6, D50).
+    """
+    _exigir_analista(request.user)
+
+    if request.method != "POST":
+        return redirect("credito:parecer_perfil", habilitacao_id=habilitacao_id)
+
+    habilitacao = get_object_or_404(Habilitacao, pk=habilitacao_id)
+    registro = obter_ou_criar_parecer_do_perfil(habilitacao, usuario=request.user)
+
+    if registro.esta_concluido:
+        messages.error(
+            request,
+            "O parecer já foi concluído: o relatório que sustentou o veredito não sai.",
+        )
+        return redirect("credito:parecer_perfil", habilitacao_id=habilitacao_id)
+
+    relatorio = get_object_or_404(RelatorioCredito, pk=relatorio_id, parecer=registro)
+    nome = relatorio.nome_original or "relatório"
+
+    # Some do storage também: relatório de crédito não fica órfão em disco.
+    relatorio.arquivo.delete(save=False)
+    relatorio.delete()
+
+    registrar(
+        acao=Acao.EXCLUSAO_DOCUMENTO,
+        descricao=f"Relatório de crédito removido da contraparte #{habilitacao.contraparte_id}",
+        objeto=habilitacao,
+        usuario=request.user,
+    )
+
+    messages.success(request, f"{nome} removido.")
     return redirect("credito:parecer_perfil", habilitacao_id=habilitacao_id)
 
 

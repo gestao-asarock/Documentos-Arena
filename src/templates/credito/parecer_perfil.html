@@ -41,30 +41,67 @@
       <strong>{{ parecer.get_veredito_display }}</strong>, por {{ parecer.analista|default:"-" }}
       em {{ parecer.data_conclusao|data_hora_br }}.
     </p>
-    <p>{{ parecer.justificativa }}</p>
+    {% if parecer.justificativa %}<p>{{ parecer.justificativa|linebreaksbr }}</p>{% endif %}
+    <ul class="lista-kit">
+      {% for relatorio in parecer.relatorios.all %}
+        <li class="lista-kit__item">
+          <span class="lista-kit__nome">
+            {{ relatorio.nome_original|default:"relatório" }}
+            {% if relatorio.descricao %}<small class="ajuda">{{ relatorio.descricao }}</small>{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
   </section>
 {% else %}
-  <form method="post" class="formulario">
-    {% csrf_token %}
+  <section class="cartao">
+    <h2>Relatório</h2>
+    <p class="ajuda">
+      O relatório da análise de crédito, em PDF. É ele que sustenta o veredito: sem pelo
+      menos um arquivo anexado, a conclusão não é aceita.
+    </p>
+    <ul class="lista-kit">
+      {% for relatorio in parecer.relatorios.all %}
+        <li class="lista-kit__item">
+          <span class="lista-kit__nome">
+            {{ relatorio.nome_original|default:"relatório" }}
+            {% if relatorio.descricao %}<small class="ajuda">{{ relatorio.descricao }}</small>{% endif %}
+          </span>
+          <form method="post"
+                action="{% url 'credito:remover_relatorio' habilitacao.pk relatorio.pk %}"
+                class="acao-inline"
+                data-confirmar="Remover “{{ relatorio.nome_original|default:'relatório' }}”? O arquivo é apagado e precisa ser enviado de novo.">
+            {% csrf_token %}
+            <button type="submit" class="botao botao--texto-perigo" title="Remover relatório">
+              Remover
+            </button>
+          </form>
+        </li>
+      {% empty %}
+        <li class="vazio">Nenhum relatório anexado.</li>
+      {% endfor %}
+    </ul>
 
-    <section class="cartao">
-      <h2>Verificações</h2>
-      <p class="ajuda">
-        Capacidade de pagamento e balanço podem ficar em branco: sem contrato, não há
-        valor a comparar.
-      </p>
-      {% for campo in form.campos_dos_blocos %}
+    <form method="post" action="{% url 'credito:anexar_relatorio' habilitacao.pk %}"
+          enctype="multipart/form-data" class="formulario">
+      {% csrf_token %}
+      {% for campo in form_relatorio %}
         <div class="campo">
           <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
           {{ campo }}
           {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
         </div>
       {% endfor %}
-    </section>
+      <div class="acoes"><button type="submit" class="botao">Anexar relatório</button></div>
+    </form>
+  </section>
+
+  <form method="post" class="formulario">
+    {% csrf_token %}
 
     <section class="cartao">
       <h2>Conclusão</h2>
-      {% for campo in form.campos_da_conclusao %}
+      {% for campo in form %}
         <div class="campo">
           <label for="{{ campo.id_for_label }}">{{ campo.label }}</label>
           {{ campo }}
@@ -72,6 +109,12 @@
           {% if campo.errors %}<small class="erro-campo">{{ campo.errors|join:" " }}</small>{% endif %}
         </div>
       {% endfor %}
+
+      {% if not parecer.tem_relatorio %}
+        <p class="aviso aviso--atencao">
+          &#9888; Anexe o relatório antes de concluir: o veredito precisa dele.
+        </p>
+      {% endif %}
 
       <p class="ajuda">
         Concluir aqui <strong>valida o perfil</strong>: é a última etapa antes de a
