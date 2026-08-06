@@ -14,12 +14,13 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 
 from contas.models import Papel, Usuario
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
 from documentos.models import StatusDocumento
 from documentos.validadores import validar_documento
-from operacoes.dossie import montar, pronto_para_assinatura
+from operacoes.dossie import montar, nome_do_contrato, pronto_para_assinatura
 from operacoes.estados import Etapa, StatusEtapa, StatusOperacao
 from operacoes.models import Operacao, TipoOperacao
 from operacoes.servicos import avancar, decidir_etapa, enquadrar
@@ -279,3 +280,76 @@ def test_docx_sem_libreoffice_avisa_em_vez_de_entregar_word(client, contrato, cr
     assert "LibreOffice não está instalado" in resposta.content.decode()
     arquivo.refresh_from_db()
     assert not arquivo.pdf_convertido
+
+
+# -- Nome do arquivo entregue (D60) -------------------------------------------
+
+
+def test_nome_do_contrato_diz_o_que_e(contrato):
+    """Sem isto o Clube recebia `a3f9c1....pdf`, igual para todo contrato baixado."""
+    esperado = f"contrato-{contrato.pk}-aluguel-de-espaco-fornecedora-ficticia-ltda-2026-04-10.pdf"
+
+    assert nome_do_contrato(contrato) == esperado
+
+
+def test_o_nome_nao_leva_cpf_nem_codigo(contrato):
+    """O nome sai do sistema junto com o PDF: e-mail, pasta compartilhada (§6)."""
+    nome = nome_do_contrato(contrato)
+
+    assert contrato.contraparte.documento not in nome
+    assert contrato.contraparte.codigo.lower() not in nome
+
+
+def test_contratos_diferentes_tem_nomes_diferentes(contrato, crm):
+    outro = enquadrar(
+        Operacao.objects.create(
+            contraparte=contrato.contraparte,
+            tipo_operacao=contrato.tipo_operacao,
+            descricao="Outro evento",
+            valor_total=Decimal("1500.00"),
+            data_evento=date(2026, 4, 10),
+            criada_por=crm,
+        ),
+        usuario=crm,
+    )
+
+    assert nome_do_contrato(contrato) != nome_do_contrato(outro)
+
+
+def test_sem_data_de_evento_usa_a_data_de_criacao(contrato):
+    """Nem todo enquadramento tem evento; o nome não pode ficar sem a data."""
+    contrato.data_evento = None
+    contrato.save()
+
+    nome = nome_do_contrato(contrato)
+
+    assert timezone.localtime(contrato.data_criacao).strftime("%Y-%m-%d") in nome
+
+
+def test_nome_longo_nao_estoura_o_limite_do_sistema_de_arquivos(contrato):
+    contrato.contraparte.nome = "Fornecedora " * 40
+    contrato.contraparte.save()
+
+    assert len(nome_do_contrato(contrato)) < 255
+
+
+def test_o_download_entrega_com_o_nome_legivel(client, contrato, crm):
+    _completar_documentacao(contrato, crm)
+    _decidir_tudo(contrato, crm)
+    arquivo = ArquivoDocumento.objects.first()
+    client.force_login(crm)
+
+    resposta = client.get(
+        reverse("operacoes:baixar_para_assinatura", args=[contrato.pk, arquivo.pk])
+    )
+
+    assert nome_do_contrato(contrato) in resposta["Content-Disposition"]
+
+
+def test_o_storage_continua_com_nome_nao_adivinhavel(contrato, crm):
+    """O nome bonito é só da entrega: no disco o UUID fica (AGENTS.md §5.4, D28)."""
+    _completar_documentacao(contrato, crm)
+    arquivo = ArquivoDocumento.objects.first()
+
+    assert contrato.contraparte.nome.lower() not in arquivo.arquivo.name.lower()
+    assert "contrato-" not in arquivo.arquivo.name

@@ -23,7 +23,7 @@ from integracoes.conversao import ConversaoIndisponivel, converter_docx_em_pdf
 
 from .consultas import com_etapa_atual
 from .dossie import montar as montar_dossie
-from .dossie import pronto_para_assinatura
+from .dossie import nome_do_contrato, pronto_para_assinatura
 from .estados import Etapa, TransicaoInvalida
 from .filtros import COLUNAS, ORDEM_PADRAO, FiltroOperacoes, montar_abas
 from .forms import (
@@ -278,6 +278,10 @@ def baixar_para_assinatura(request, pk: int, arquivo_id: int):
         arquivo.pdf_convertido.save(nome, ContentFile(pdf), save=True)
 
     entrega = arquivo.arquivo_para_assinatura
+    # O nome de entrega é montado agora, e nada muda no storage: lá o UUID
+    # continua, porque caminho adivinhável é vazamento (AGENTS.md §5.4, D60).
+    nome_entregue = nome_do_contrato(operacao, Path(entrega.name).suffix.lower() or ".pdf")
+
     registrar(
         acao=Acao.DOWNLOAD,
         descricao=f"Contrato #{operacao.pk} baixado para assinatura",
@@ -294,13 +298,19 @@ def baixar_para_assinatura(request, pk: int, arquivo_id: int):
         )
 
     if settings.ARMAZENAMENTO == "s3":
-        return redirect(entrega.url)
+        # A URL assinada serve o objeto pelo nome da chave, que é o UUID. Quem
+        # renomeia é o próprio S3, pelo cabeçalho pedido na assinatura: sem este
+        # parâmetro o navegador salvaria o UUID mesmo com o nome montado acima.
+        return redirect(
+            entrega.storage.url(
+                entrega.name,
+                parameters={
+                    "ResponseContentDisposition": f'attachment; filename="{nome_entregue}"'
+                },
+            )
+        )
 
-    return FileResponse(
-        entrega.open("rb"),
-        as_attachment=True,
-        filename=Path(entrega.name).name,
-    )
+    return FileResponse(entrega.open("rb"), as_attachment=True, filename=nome_entregue)
 
 
 @login_required

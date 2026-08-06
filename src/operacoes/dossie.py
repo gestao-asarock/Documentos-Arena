@@ -11,6 +11,8 @@ compliance entram como detalhe da etapa correspondente, não como item à parte.
 from dataclasses import dataclass, field
 
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
 
 from contrapartes.models import Habilitacao
 from documentos.models import StatusDocumento
@@ -224,6 +226,37 @@ def montar(operacao) -> list[Checagem]:
         )
 
     return checagens
+
+
+#: Teto de cada pedaço do nome. O limite prático de nome de arquivo é 255
+#: caracteres, e razão social longa consome isso sozinha.
+LIMITE_DO_PEDACO = 40
+
+
+def nome_do_contrato(operacao, extensao: str = ".pdf") -> str:
+    """Nome legível para o contrato entregue na etapa de assinatura (AGENTS.md D60).
+
+    No storage o nome é um UUID, e continua sendo: caminho adivinhável é
+    vazamento (AGENTS.md §5.4, D28). Mas isso vale para o disco, não para o que
+    a pessoa recebe. Na pasta de downloads de quem coleta assinaturas, vinte
+    arquivos chamados `a3f9c1...pdf` são vinte arquivos que precisam ser abertos
+    um a um para descobrir qual é qual.
+
+    O **número do contrato** é o que garante nome distinto entre downloads; tipo,
+    contraparte e data são o que faz o nome ser lido sem abrir o arquivo.
+
+    Sem CPF/CNPJ e sem o código da contraparte: o nome do arquivo sai do sistema
+    junto com o PDF, vai para pasta compartilhada e para anexo de e-mail, e o que
+    atravessa essa fronteira é o mínimo (AGENTS.md §6).
+    """
+    data = operacao.data_evento or timezone.localtime(operacao.data_criacao).date()
+    partes = [
+        f"contrato-{operacao.pk}",
+        slugify(operacao.tipo_operacao.nome)[:LIMITE_DO_PEDACO],
+        slugify(operacao.contraparte.nome)[:LIMITE_DO_PEDACO],
+        data.strftime("%Y-%m-%d"),
+    ]
+    return "-".join(parte for parte in partes if parte) + extensao
 
 
 def pronto_para_assinatura(operacao) -> bool:

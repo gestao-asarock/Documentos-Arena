@@ -801,6 +801,25 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   (`-`). Docstring e comentário ficam de fora: são texto para quem lê o código.
   `tests/test_templates.py` varre os templates e, pelo `ast`, as strings do Python que não
   são docstring — o que passa a valer também para o código que ainda não existe.
+- **D60 — Nome do arquivo entregue é legível; o nome no storage continua UUID.** Decisão de
+  06/08/2026. O download da etapa de assinatura entregava `a3f9c1...pdf`, e na pasta de
+  quem coleta assinaturas vinte contratos viravam vinte arquivos indistinguíveis, que só se
+  identificam abrindo um a um.
+  - **As duas coisas não são a mesma.** O nome **no storage** é UUID porque caminho
+    adivinhável é vazamento (§5.4, D28) e isso não muda. O nome **de entrega** é montado na
+    hora do download, em `operacoes.dossie.nome_do_contrato`, e só existe no
+    `Content-Disposition`: `contrato-8-aluguel-de-espaco-fornecedora-ficticia-2026-04-10.pdf`.
+  - **O número do contrato é o que distingue**; tipo, contraparte e data são o que faz o
+    nome ser lido sem abrir o arquivo. A data é a do evento, ou a de criação quando o
+    enquadramento não tem evento.
+  - **Sem CPF/CNPJ e sem o código da contraparte** (D59). O nome do arquivo atravessa a
+    fronteira do sistema junto com o PDF: vai para pasta compartilhada, anexo de e-mail e
+    backup de estação de trabalho. O que sai daqui é o mínimo (§6).
+  - **No S3 quem renomeia é o bucket.** A URL assinada serve o objeto pelo nome da chave,
+    então a view pede `ResponseContentDisposition` na assinatura. Sem isso o navegador
+    salvaria o UUID mesmo com o nome montado do lado do Django.
+  - Os outros downloads (`baixar_documento`, `baixar_relatorio`) já entregavam pelo
+    `nome_original`, que é o nome com que o arquivo foi enviado. Ficam como estão.
 - **D59 — Código público da contraparte, derivado do CPF/CNPJ.** Decisão de 06/08/2026.
   A contraparte ganha um identificador de doze caracteres (`K7M4-2QX9-BT5R`) para aparecer
   na tela no lugar de um número sequencial.

@@ -318,6 +318,20 @@ registro invisível vazaria a existência dele e o link daria 404 (D35).
 > com outro nome trocava o nome de uma contraparte **já validada**, sem confirmação e sem
 > auditoria: era a porta lateral do D47, que bloqueia a edição exatamente nesse caso.
 
+**O contrato baixado sai com nome legível** (AGENTS.md D60):
+`contrato-8-aluguel-de-espaco-fornecedora-ficticia-2026-04-10.pdf`, montado por
+`operacoes.dossie.nome_do_contrato`. O número é o que distingue um download do outro; tipo,
+contraparte e data são o que faz o nome ser lido sem abrir o arquivo.
+
+> **Nome de entrega e nome de storage são coisas diferentes.** No disco o UUID **fica**:
+> caminho adivinhável é vazamento (§5.4, D28). O nome bonito existe só no
+> `Content-Disposition`. Não "conserte" o `caminho_do_arquivo` para gravar nome legível.
+
+> **Nada de CPF/CNPJ nem do código da contraparte no nome.** Ele sai do sistema junto com o
+> PDF: pasta compartilhada, anexo de e-mail, backup de estação. E **no S3 quem renomeia é o
+> bucket**, via `ResponseContentDisposition` na URL assinada; sem esse parâmetro o
+> navegador salva o UUID mesmo com o nome montado do lado do Django.
+
 **Contraparte tem código público** (AGENTS.md D59): doze caracteres como `K7M4-2QX9-BT5R`,
 derivados do CPF/CNPJ por **HMAC-SHA256** com a chave `HASH_KEY` do `.env`. Tudo mora em
 `contrapartes/codigo.py` (`gerar_codigo`, `formatar_codigo`, `normalizar_codigo`); o campo
