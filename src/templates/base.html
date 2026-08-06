@@ -7,10 +7,10 @@
   <title>{% block titulo %}Documentos Arena{% endblock %}</title>
   <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
   {# Incremente o ?v= ao editar CSS ou JS: sem isso o navegador serve a versão antiga. #}
-  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=10">
-  {# HTMX entra quando a primeira tela precisar (upload, polling de análise). #}
-  {# Baixe htmx.min.js para src/static/js/. Nada de CDN: o servidor é privado. #}
-  <script src="{% static 'js/formulario.js' %}?v=8" defer></script>
+  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=13">
+  {# Servido daqui, nunca de CDN: o servidor é privado (AGENTS.md §2). #}
+  <script src="{% static 'js/htmx.min.js' %}" defer></script>
+  <script src="{% static 'js/formulario.js' %}?v=10" defer></script>
 </head>
 <body>
   {% if user.is_authenticated %}

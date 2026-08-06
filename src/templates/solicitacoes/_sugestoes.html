@@ -1,0 +1,21 @@
+{% load formatacao %}{% comment %}
+  Sugestões de contraparte da busca (htmx). Cada uma é um link para a mesma
+  lista com a contraparte fixada e os demais filtros preservados.
+
+  Link, e não botão de formulário: assim a sugestão abre em nova aba, aparece no
+  histórico e funciona igual ao resto da navegação do sistema.
+{% endcomment %}
+{% if sugestoes %}
+  <ul class="sugestoes__lista">
+    {% for item in sugestoes %}
+      <li>
+        <a href="{{ item.url }}">
+          <span class="sugestoes__nome">{{ item.contraparte.nome }}</span>
+          <span class="sugestoes__documento">{{ item.contraparte.documento|cpf_cnpj }}</span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% elif buscou %}
+  <p class="sugestoes__vazio">Nenhuma contraparte com esse nome ou documento.</p>
+{% endif %}

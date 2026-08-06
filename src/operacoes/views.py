@@ -16,13 +16,16 @@ from django.core.files.base import ContentFile
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
+from arena.listagem import ordenar, paginar
 from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
 from integracoes.conversao import ConversaoIndisponivel, converter_docx_em_pdf
 
+from .consultas import com_etapa_atual
 from .dossie import montar as montar_dossie
 from .dossie import pronto_para_assinatura
 from .estados import Etapa, TransicaoInvalida
+from .filtros import COLUNAS, ORDEM_PADRAO, FiltroOperacoes, montar_abas
 from .forms import (
     DecisaoEtapaForm,
     EnvioDocumentoContratoForm,
@@ -30,7 +33,7 @@ from .forms import (
     VincularDocumentosForm,
 )
 from .models import EtapaAprovacao, Operacao
-from .permissoes import pode_cancelar, pode_criar_operacao, pode_decidir
+from .permissoes import pode_cancelar, pode_criar_operacao, pode_decidir, pode_excluir
 from .servicos import (
     ContraparteNaoHabilitada,
     EnquadramentoAmbiguo,
@@ -45,11 +48,35 @@ from .servicos import (
 
 @login_required
 def lista(request):
-    operacoes = operacoes_visiveis_para(request.user).prefetch_related("etapas")
+    """Lista de contratos com abas por tipo, filtros, ordenação e paginação.
+
+    A ordem das operações importa: filtrar primeiro, ordenar depois, paginar por
+    último. Paginar antes de filtrar devolveria "25 de 300" e recortaria a
+    página, não a lista.
+    """
+    visiveis = com_etapa_atual(operacoes_visiveis_para(request.user))
+    filtro = FiltroOperacoes(request.GET, visiveis=visiveis)
+
+    encontradas, ordem = ordenar(
+        filtro.aplicar(visiveis),
+        request.GET.get("ordem", ""),
+        colunas=COLUNAS,
+        padrao=ORDEM_PADRAO,
+    )
+    pagina = paginar(encontradas.prefetch_related("etapas"), request.GET.get("pagina"))
+
     return render(
         request,
         "operacoes/lista.html",
-        {"operacoes": operacoes, "pode_criar": pode_criar_operacao(request.user)},
+        {
+            "pagina": pagina,
+            "operacoes": pagina.object_list,
+            "total": pagina.paginator.count,
+            "filtro": filtro,
+            "ordem": ordem,
+            "abas": montar_abas(request.GET, visiveis, filtro.valor("tipo")),
+            "pode_criar": pode_criar_operacao(request.user),
+        },
     )
 
 
@@ -108,6 +135,10 @@ def detalhe(request, pk: int):
                 and pode_decidir(request.user, etapa_atual)
             ),
             "pode_cancelar": operacao.pode_ser_cancelada and pode_cancelar(request.user, operacao),
+            "pode_excluir": pode_excluir(request.user, operacao),
+            # A tela conta o que a exclusão leva junto: as etapas são CASCATA e
+            # com elas vai o texto de cada parecer (AGENTS.md D58).
+            "etapas_decididas": sum(1 for e in operacao.etapas.all() if e.esta_decidida),
             "form_decisao": DecisaoEtapaForm(),
             "documentos_exigidos": operacao.documentos_exigidos(),
             "documentos_pendentes": operacao.documentos_pendentes(),
@@ -439,6 +470,43 @@ def cancelar(request, pk: int):
     )
     messages.success(request, f"Operação #{operacao.pk} cancelada.")
     return redirect("operacoes:detalhe", pk=pk)
+
+
+@login_required
+def excluir(request, pk: int):
+    """Apaga de vez um contrato cancelado (AGENTS.md D58). Só o administrador.
+
+    **Isto apaga as etapas junto**, e com elas os pareceres de quem aprovou ou
+    reprovou cada uma (`EtapaAprovacao` é `CASCADE`). A trilha de auditoria fica
+    (§6), mas o texto das decisões, não: por isso a tela conta quantas etapas
+    vão embora antes do clique, e por isso o evento gravado aqui também conta.
+
+    Os documentos **não** saem: eles pertencem à contraparte e podem estar
+    sustentando outro contrato (D29). O parecer de crédito também fica, só perde
+    o vínculo com este contrato (`SET_NULL`).
+    """
+    if request.method != "POST":
+        return redirect("operacoes:detalhe", pk=pk)
+
+    operacao = get_object_or_404(operacoes_visiveis_para(request.user), pk=pk)
+    if not pode_excluir(request.user, operacao):
+        raise PermissionDenied
+
+    numero, etapas = operacao.pk, operacao.etapas.count()
+    registrar(
+        acao=Acao.EXCLUSAO_REGISTRO,
+        descricao=(
+            f"Contrato #{numero} excluído pelo administrador, com {etapas} etapa"
+            f"{'s' if etapas != 1 else ''} e seus pareceres. "
+            f"Contraparte #{operacao.contraparte_id} e documentos mantidos"
+        ),
+        objeto=operacao,
+        usuario=request.user,
+    )
+    operacao.delete()
+
+    messages.success(request, f"Contrato #{numero} excluído. Os documentos da contraparte ficam.")
+    return redirect("operacoes:lista")
 
 
 def _mensagem(erro) -> str:

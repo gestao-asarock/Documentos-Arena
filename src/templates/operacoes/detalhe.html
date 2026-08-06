@@ -285,6 +285,10 @@
       {% if operacao.motivo_cancelamento %}<br>Motivo: {{ operacao.motivo_cancelamento }}{% endif %}
     </p>
   </section>
+  {% if pode_excluir %}
+    {% url 'operacoes:excluir' operacao.pk as url_excluir %}
+    {% include "_excluir.html" with url_excluir=url_excluir rotulo="contrato" consequencia="As etapas do contrato vão junto. Os documentos e a contraparte ficam: eles não pertencem a este contrato." %}
+  {% endif %}
 {% elif pode_cancelar %}
   {% url 'operacoes:cancelar' operacao.pk as url_cancelar %}
   {% include "_cancelar.html" with url_cancelar=url_cancelar rotulo="operação" %}

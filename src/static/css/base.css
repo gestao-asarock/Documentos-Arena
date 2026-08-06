@@ -69,7 +69,14 @@
   --texto-titulo: 24px;
   --texto-secao: 18px;
 
-  --raio: 6px;
+  /*
+   * Dois raios, e a diferença é de escala. Canto reto num painel grande lê como
+   * acabamento pela metade; o mesmo raio de um botão, aplicado a uma caixa de
+   * 1200px, some. Controle e pastilha usam `--raio`; superfície grande (cartão,
+   * painel de filtros, tabela de lista, login) usa `--raio-caixa`.
+   */
+  --raio: 8px;
+  --raio-caixa: 12px;
 }
 
 * {
@@ -200,7 +207,7 @@ a:hover { text-decoration-thickness: 2px; }
 .cartao {
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio-caixa);
   padding: var(--esp-4);
   margin-bottom: var(--esp-4);
 }
@@ -211,6 +218,39 @@ a:hover { text-decoration-thickness: 2px; }
   border-bottom: 1px solid var(--cor-borda);
   text-align: left;
   vertical-align: top;
+}
+
+/*
+ * A tabela de lista respira mais que as outras. Linha fina espreme perfil e
+ * contrato num rodapé de planilha, e o que está ali é o registro de uma pessoa
+ * e de um contrato assinado: densidade demais fazia cada linha parecer descarte.
+ * A altura mínima também dá alvo de clique de verdade, já que a linha inteira é
+ * clicável.
+ *
+ * Só na lista: as tabelas de etapas e de conferência continuam compactas, porque
+ * ali a comparação entre linhas vizinhas é o trabalho.
+ */
+.tabela--lista {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-caixa);
+  overflow: hidden;
+}
+.tabela--lista th, .tabela--lista td {
+  padding: var(--esp-3) var(--esp-4);
+  vertical-align: middle;
+}
+.tabela--lista tbody td { height: 56px; }
+.tabela--lista tbody tr:last-child td { border-bottom: none; }
+.tabela--lista tbody a { font-size: var(--texto-p); }
+
+/* Dado de apoio embaixo do principal: documento sob o nome, data sob a data. */
+.celula__apoio {
+  display: block;
+  margin-top: 2px;
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+  font-weight: 400;
 }
 .tabela th {
   font-size: var(--texto-pequeno);
@@ -387,26 +427,36 @@ a:hover { text-decoration-thickness: 2px; }
 /* Bloco do endereço: some inteiro até o CEP ser consultado, e por isso precisa
    repetir o espaçamento do formulário — o `gap` do pai não atravessa a caixa. */
 .campos-endereco { display: flex; flex-direction: column; gap: var(--esp-4); }
-.formulario label {
+/*
+ * Campo de formulário se veste igual em qualquer lugar que peça dado, e não só
+ * dentro de `.formulario`. A barra de filtros nasceu fora dessa classe e todos
+ * os controles dela caíram no padrão cru do navegador: borda fina, canto reto,
+ * altura de 24px. Parecia página sem CSS, e era.
+ *
+ * `:is()` mantém a lista de contêineres num lugar só. Tela nova que colete dado
+ * entra aqui, em vez de copiar as regras.
+ */
+:is(.formulario, .filtros) label {
   font-size: var(--texto-p);
   font-weight: 500;
   color: var(--cor-texto);
 }
 .obrigatorio { color: var(--cor-reprovado); }
-.formulario input,
-.formulario select,
-.formulario textarea {
-  min-height: 42px;
+:is(.formulario, .filtros) input,
+:is(.formulario, .filtros) select,
+:is(.formulario, .filtros) textarea {
+  min-height: 44px;
   padding: var(--esp-2) var(--esp-3);
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio);
   font: inherit;
+  font-size: var(--texto-p);
   background: var(--cor-superficie);
   color: var(--cor-texto);
 }
-.formulario input:focus,
-.formulario select:focus,
-.formulario textarea:focus {
+:is(.formulario, .filtros) input:focus,
+:is(.formulario, .filtros) select:focus,
+:is(.formulario, .filtros) textarea:focus {
   outline: 2px solid var(--cor-primaria);
   outline-offset: -1px;
   border-color: var(--cor-primaria);
@@ -417,13 +467,13 @@ a:hover { text-decoration-thickness: 2px; }
  * veste como `.botao--discreto` sem trocar o input por um controle de JS: o
  * campo continua nativo, acessível e navegável por teclado.
  */
-.formulario input[type="file"] {
+:is(.formulario, .filtros) input[type="file"] {
   padding: var(--esp-2);
   align-items: center;
   cursor: pointer;
   color: var(--cor-texto-suave);
 }
-.formulario input[type="file"]::file-selector-button {
+:is(.formulario, .filtros) input[type="file"]::file-selector-button {
   margin-right: var(--esp-3);
   min-height: 32px;
   padding: var(--esp-1) var(--esp-4);
@@ -435,11 +485,11 @@ a:hover { text-decoration-thickness: 2px; }
   font-weight: 500;
   cursor: pointer;
 }
-.formulario input[type="file"]:hover::file-selector-button {
+:is(.formulario, .filtros) input[type="file"]:hover::file-selector-button {
   background: var(--cor-selecao);
   border-color: var(--cor-primaria);
 }
-.formulario input[type="file"]:focus-visible::file-selector-button {
+:is(.formulario, .filtros) input[type="file"]:focus-visible::file-selector-button {
   outline: 2px solid var(--cor-primaria);
   outline-offset: 1px;
 }
@@ -449,8 +499,8 @@ a:hover { text-decoration-thickness: 2px; }
  * altura, padding e borda de input — o que a esticava, empurrava o rótulo para
  * a linha de baixo e desalinhava tudo. Aqui ela volta a ser uma caixa.
  */
-.formulario input[type="checkbox"],
-.formulario input[type="radio"],
+:is(.formulario, .filtros) input[type="checkbox"],
+:is(.formulario, .filtros) input[type="radio"],
 input[type="checkbox"],
 input[type="radio"] {
   flex: 0 0 auto;
@@ -469,7 +519,7 @@ input[type="radio"] {
  * estilo a lista herda marcador e recuo, e o rótulo fica solto do quadradinho.
  */
 .campo ul,
-.formulario ul {
+:is(.formulario, .filtros) ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -478,7 +528,7 @@ input[type="radio"] {
   gap: var(--esp-2);
 }
 .campo li label,
-.formulario li label,
+:is(.formulario, .filtros) li label,
 .rotulo-marcacao {
   display: flex;
   align-items: center;
@@ -493,7 +543,8 @@ input[type="radio"] {
 .rotulo-marcacao--alto input { margin-top: 3px; }
 .campo--erro input, .campo--erro select { border-color: var(--cor-reprovado); }
 .campo--carregando { background-image: linear-gradient(90deg, transparent, var(--cor-fundo)); }
-.formulario textarea, .formulario select {
+:is(.formulario, .filtros) textarea,
+:is(.formulario, .filtros) select {
   padding: var(--esp-2);
   border: 1px solid var(--cor-borda);
   border-radius: var(--raio);
@@ -663,7 +714,7 @@ input[type="radio"] {
   margin: 10vh auto;
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);
-  border-radius: var(--raio);
+  border-radius: var(--raio-caixa);
   padding: var(--esp-6);
 }
 /* Cabeçalho da tela centrado, para acompanhar o brasão acima dele. */
@@ -685,3 +736,309 @@ input[type="radio"] {
   height: 72px;
   margin: 0 auto var(--esp-4);
 }
+
+/* Listas: abas, filtros e paginação ------------------------------------- */
+
+/*
+ * As abas dividem o trabalho por tipo de contrato. São navegação, não estado:
+ * ficam em cinza, e a contagem ao lado é o que diz onde há trabalho. Pintar a
+ * aba ativa de cor a faria concorrer com os selos de status da própria tabela.
+ */
+.abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-1);
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: var(--esp-4);
+}
+.abas__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  padding: var(--esp-2) var(--esp-4);
+  color: var(--cor-texto-suave);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.abas__item:hover { color: var(--cor-texto); background: var(--cor-selecao); }
+.abas__item--ativa {
+  color: var(--cor-texto);
+  font-weight: 600;
+  border-bottom-color: var(--cor-primaria);
+}
+.abas__contagem {
+  font-size: var(--texto-pequeno);
+  font-weight: 400;
+  color: var(--cor-texto-suave);
+  background: var(--cor-neutro-fundo);
+  border-radius: 999px;
+  padding: 1px var(--esp-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.filtros {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-caixa);
+  padding: var(--esp-4) var(--esp-5);
+  margin-bottom: var(--esp-4);
+}
+.filtros__linha {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--esp-3);
+  flex-wrap: wrap;
+}
+/*
+ * A busca domina a linha: é o caminho mais curto para achar um registro. Mas
+ * não sem limite: esticada até a borda, ela empurrava o botão "Filtrar" para o
+ * outro lado da tela, longe do campo que ele submete.
+ */
+.filtros__busca { position: relative; flex: 1 1 320px; max-width: 460px; }
+.filtros__rotulo {
+  display: block;
+  font-size: var(--texto-p);
+  font-weight: 500;
+  color: var(--cor-texto);
+  margin-bottom: var(--esp-1);
+}
+.filtros__busca input { width: 100%; }
+/* Alinha com os campos ao lado, que têm rótulo acima e 44px de altura. */
+.filtros__linha .botao { min-height: 44px; }
+
+/*
+ * Os dois painéis lado a lado quando cabem, empilhados quando não. Cada um abre
+ * e fecha por conta própria: quem só quer recortar por data não precisa abrir o
+ * painel inteiro de situação e valor.
+ */
+.filtros__paineis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  margin-top: var(--esp-3);
+}
+/* Fechado, o painel é só o botão; aberto, toma a linha inteira. */
+.filtros__paineis > .filtros__mais { flex: 0 0 auto; }
+.filtros__paineis > .filtros__mais[open] { flex: 1 0 100%; }
+.filtros__contagem {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--cor-primaria);
+  color: #fff;
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.filtros__mais { margin-top: 0; }
+/*
+ * O "Mais filtros" é o que abre o painel inteiro: em 13px cinza ele parecia
+ * rodapé de aviso, e não o controle principal da barra.
+ */
+.filtros__mais > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  cursor: pointer;
+  color: var(--cor-texto);
+  font-size: var(--texto-p);
+  font-weight: 500;
+  padding: var(--esp-2) var(--esp-3);
+  margin-left: calc(var(--esp-3) * -1);
+  border-radius: var(--raio);
+}
+.filtros__mais > summary:hover { background: var(--cor-selecao); }
+.filtros__mais > summary:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: 2px;
+}
+.filtros__grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--esp-4);
+  margin-top: var(--esp-4);
+  padding-top: var(--esp-4);
+  border-top: 1px solid var(--cor-borda);
+}
+.filtros__grade .campo { margin-bottom: 0; }
+/* Rótulo colado no controle: o `gap` de 4px sumia entre campos de 44px. */
+.filtros__grade .campo label { margin-bottom: var(--esp-1); }
+
+/*
+ * Seleção múltipla: caixas empilhadas com rolagem, em vez do `select multiple`
+ * do navegador, que exige segurar Ctrl para marcar mais de um e não mostra o
+ * que está marcado quando a lista rola.
+ *
+ * A caixa acompanha a altura dos campos vizinhos e mostra quatro opções
+ * inteiras: cortar a quarta pela metade é o que avisa que há mais abaixo.
+ */
+.selecao-multipla {
+  max-height: 152px;
+  overflow-y: auto;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  padding: var(--esp-2) var(--esp-3);
+  margin: 0;
+  list-style: none;
+  background: var(--cor-superficie);
+}
+.selecao-multipla li { margin: 0; }
+.selecao-multipla label {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+  min-height: 32px;
+  font-size: var(--texto-p);
+  font-weight: 400;
+  cursor: pointer;
+}
+.selecao-multipla label:hover { color: var(--cor-primaria); }
+
+/*
+ * Campo de data: texto com máscara **e** botão de calendário (AGENTS.md D56).
+ * A caixa e o botão são montados pelo `formulario.js`; sem JavaScript sobra o
+ * campo de texto, que é quem vale.
+ *
+ * O `input[type=date]` fica aqui só para abrir o calendário nativo. Ele precisa
+ * continuar renderizado: `display: none` faz o `showPicker()` do Chrome
+ * levantar erro. Por isso some por opacidade, e não por exibição.
+ */
+.campo-data { position: relative; display: flex; }
+.campo-data > input { flex: 1; padding-right: 44px; }
+.campo-data__nativo {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.campo-data__abrir {
+  position: absolute;
+  right: var(--esp-1);
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--raio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+.campo-data__abrir:hover { background: var(--cor-selecao); color: var(--cor-texto); }
+.campo-data__abrir:focus-visible {
+  outline: 2px solid var(--cor-primaria);
+  outline-offset: -2px;
+}
+
+/*
+ * Etiquetas do que está filtrando. Respondem "por que esta lista está curta?"
+ * sem obrigar a abrir o painel, e cada uma sai sozinha pelo x.
+ */
+.etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  list-style: none;
+  margin: var(--esp-3) 0 0;
+  padding: 0;
+}
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  background: var(--cor-neutro-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  padding: 2px var(--esp-2) 2px var(--esp-3);
+  font-size: var(--texto-pequeno);
+}
+.etiqueta__campo { color: var(--cor-texto-suave); }
+.etiqueta__sair {
+  color: var(--cor-texto-suave);
+  text-decoration: none;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.etiqueta__sair:hover { color: var(--cor-erro); }
+
+/* Sugestões da busca: flutuam sobre a lista, sem empurrar a tabela para baixo. */
+.sugestoes { position: relative; }
+.sugestoes__lista {
+  position: absolute;
+  z-index: 10;
+  top: var(--esp-1);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: var(--esp-1);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+.sugestoes__lista a {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--esp-3);
+  padding: var(--esp-2) var(--esp-3);
+  border-radius: var(--raio);
+  text-decoration: none;
+  color: var(--cor-texto);
+}
+.sugestoes__lista a:hover, .sugestoes__lista a:focus-visible { background: var(--cor-selecao); }
+.sugestoes__nome { font-weight: 500; }
+.sugestoes__documento { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.sugestoes__vazio {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  right: 0;
+  margin: var(--esp-1) 0 0;
+  padding: var(--esp-2) var(--esp-3);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+}
+
+/* Cabeçalho ordenável: a seta só aparece na coluna que está ordenando. */
+.ordenar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-1);
+  color: inherit;
+  text-decoration: none;
+}
+.ordenar:hover { color: var(--cor-texto); }
+.ordenar--ativa { color: var(--cor-texto); font-weight: 600; }
+.ordenar__seta { font-size: 10px; }
+.tabela__numero .ordenar { justify-content: flex-end; }
+
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esp-3);
+  margin-top: var(--esp-4);
+}
+.paginacao__posicao { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+/* Extremo da paginação: o botão fica, apagado, para a barra não mudar de largura. */
+.botao--inativo { opacity: 0.45; pointer-events: none; }

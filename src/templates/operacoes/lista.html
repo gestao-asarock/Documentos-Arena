@@ -1,47 +1,74 @@
 {% extends "base.html" %}
-{% load formatacao %}
+{% load formatacao listagem %}
 
-{% block titulo %}Operações | Documentos Arena{% endblock %}
+{% block titulo %}Contratos | Documentos Arena{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
-  <h1>Operações</h1>
-  <span class="contador">{{ operacoes|length }} registro{{ operacoes|length|pluralize:",s" }}</span>
+  <h1>Contratos</h1>
+  <span class="contador">{{ total }} registro{{ total|pluralize:",s" }}</span>
   {% if pode_criar %}
     <a class="botao" href="{% url 'operacoes:nova' %}">Novo contrato</a>
   {% endif %}
 </div>
 
+{% comment %}
+  As abas dividem por tipo de contrato, que é como o trabalho se divide. A
+  contagem de cada uma já considera os outros filtros, então a soma das abas
+  bate com o que está na tela.
+{% endcomment %}
+<nav class="abas" aria-label="Tipo de contrato">
+  {% for aba in abas %}
+    <a class="abas__item{% if aba.ativa %} abas__item--ativa{% endif %}"
+       {% if aba.ativa %}aria-current="page"{% endif %}
+       href="{% url_com tipo=aba.tipo.pk %}">
+      {{ aba.rotulo }}<span class="abas__contagem">{{ aba.total }}</span>
+    </a>
+  {% endfor %}
+</nav>
+
+{% include "_filtros.html" with filtro=filtro origem="contratos" %}
+
 {% if operacoes %}
-  <table class="tabela">
+  <table class="tabela tabela--lista">
     <thead>
       <tr>
-        <th>#</th>
-        <th>Contraparte</th>
-        <th>Tipo</th>
-        <th class="tabela__numero">Valor</th>
-        <th>Enquadramento</th>
-        <th>Situação</th>
-        <th>Etapa atual</th>
-        <th>Criada em</th>
+        {% coluna "numero" "#" %}
+        {% coluna "contraparte" "Contraparte" %}
+        {% coluna "tipo" "Tipo" %}
+        {% coluna "valor" "Valor" numero=True %}
+        {% coluna "enquadramento" "Enquadramento" %}
+        {% coluna "situacao" "Situação" %}
+        {% coluna "etapa" "Etapa atual" %}
+        {% coluna "criacao" "Criada em" %}
       </tr>
     </thead>
     <tbody>
       {% for operacao in operacoes %}
         <tr data-href="{% url 'operacoes:detalhe' operacao.pk %}" class="linha-clicavel">
           <td>{{ operacao.pk }}</td>
-          <td><a href="{% url 'operacoes:detalhe' operacao.pk %}">{{ operacao.contraparte.nome }}</a></td>
+          <td>
+            <a href="{% url 'operacoes:detalhe' operacao.pk %}">{{ operacao.contraparte.nome }}</a>
+            <small class="celula__apoio">{{ operacao.contraparte.documento|cpf_cnpj }}</small>
+          </td>
           <td>{{ operacao.tipo_operacao }}</td>
           <td class="tabela__numero">{{ operacao.valor_total|moeda }}</td>
           <td>{{ operacao.regra.criterio|default:"-" }}</td>
           <td>{% include "operacoes/_situacao.html" with status=operacao.status rotulo=operacao.get_status_display %}</td>
           <td>{{ operacao.etapa_atual.get_etapa_display|default:"-" }}</td>
-          <td>{{ operacao.data_criacao|data_br }}</td>
+          <td>
+            {{ operacao.data_criacao|data_br }}
+            <small class="celula__apoio">Movimentada em {{ operacao.data_atualizacao|data_br }}</small>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+
+  {% include "_paginacao.html" with pagina=pagina %}
+{% elif filtro.tem_filtro %}
+  <p class="vazio">Nenhum contrato atende a esses filtros. Tente afrouxar algum deles.</p>
 {% else %}
-  <p class="vazio">Nenhuma operação cadastrada ainda.</p>
+  <p class="vazio">Nenhum contrato cadastrado ainda.</p>
 {% endif %}
 {% endblock %}

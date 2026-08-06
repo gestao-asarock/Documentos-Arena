@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% load formatacao %}
+{% load formatacao listagem %}
 
 {% block titulo %}Perfis | Documentos Arena{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
   <h1>Perfis de contraparte</h1>
-  <span class="contador">{{ solicitacoes|length }} perfil{{ solicitacoes|length|pluralize:",s" }}</span>
+  <span class="contador">{{ total }} perfil{{ total|pluralize:",s" }}</span>
   {% if pode_criar %}
     <a class="botao" href="{% url 'solicitacoes:nova' %}">Novo perfil</a>
   {% endif %}
@@ -17,16 +17,19 @@
   estiverem vigentes.
 </p>
 
+{% include "_filtros.html" with filtro=filtro origem="perfis" %}
+
 {% if solicitacoes %}
-  <table class="tabela">
+  <table class="tabela tabela--lista">
     <thead>
       <tr>
-        <th>#</th>
-        <th>Contraparte</th>
-        <th>CPF/CNPJ</th>
-        <th>Tipo</th>
-        <th>Situação</th>
-        <th>Validação</th>
+        {% coluna "numero" "#" %}
+        {% coluna "contraparte" "Contraparte" %}
+        {% coluna "documento" "CPF/CNPJ" %}
+        {% coluna "tipo" "Tipo" %}
+        {% coluna "situacao" "Situação" %}
+        {% coluna "validacao" "Validação" %}
+        {% coluna "criacao" "Cadastrado em" %}
       </tr>
     </thead>
     <tbody>
@@ -37,6 +40,9 @@
             <a href="{% url 'solicitacoes:detalhe' solicitacao.pk %}">
               {{ solicitacao.contraparte.nome }}
             </a>
+            {% if solicitacao.contraparte.parte_relacionada %}
+              <small class="celula__apoio">Parte relacionada</small>
+            {% endif %}
           </td>
           <td>{{ solicitacao.contraparte.documento|cpf_cnpj }}</td>
           <td>{{ solicitacao.contraparte.get_tipo_pessoa_display }}</td>
@@ -48,10 +54,18 @@
               {% else %}-{% endif %}
             {% endwith %}
           </td>
+          <td>
+            {{ solicitacao.data_criacao|data_br }}
+            <small class="celula__apoio">Movimentado em {{ solicitacao.data_atualizacao|data_br }}</small>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
+
+  {% include "_paginacao.html" with pagina=pagina %}
+{% elif filtro.tem_filtro %}
+  <p class="vazio">Nenhum perfil atende a esses filtros. Tente afrouxar algum deles.</p>
 {% else %}
   <p class="vazio">Nenhum perfil cadastrado ainda.</p>
 {% endif %}

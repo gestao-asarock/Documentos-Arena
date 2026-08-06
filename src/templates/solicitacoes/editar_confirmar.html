@@ -82,6 +82,13 @@
     {% endcomment %}
     {% for campo in form %}{{ campo.as_hidden }}{% endfor %}
     <input type="hidden" name="confirmado" value="1">
+    {% comment %}
+      `revalidar` não é campo do formulário, então o laço acima não o carrega.
+      Sem esta linha a escolha do administrador se perderia neste segundo POST e
+      a alteração gravaria sem reiniciar nada, que é o oposto do que ele pediu na
+      tela anterior (AGENTS.md D58).
+    {% endcomment %}
+    {% if revalidar_marcado %}<input type="hidden" name="revalidar" value="1">{% endif %}
 
     <div class="campo{% if faltou_ciencia %} campo--erro{% endif %}">
       <label class="rotulo-marcacao rotulo-marcacao--alto" for="ciente">

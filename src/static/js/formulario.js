@@ -84,6 +84,90 @@
   });
 
   /*
+   * Calendário ao lado do campo de data, sem tirar a digitação.
+   *
+   * O campo continua sendo texto com máscara, pelo motivo de sempre: o seletor
+   * nativo não aceita data colada, e quem trabalha copiando dados de outra tela
+   * ficava sem caminho (solicitacoes/campos.py). Mas digitar não é sempre o mais
+   * rápido: para "ontem" ou "a mesma semana do evento", um clique no calendário
+   * ganha de qualquer digitação.
+   *
+   * A solução são os dois: o texto é quem vale, e o `input[type=date]` fica ao
+   * lado, invisível, só para abrir o calendário nativo do navegador. O que ele
+   * devolve é escrito de volta no texto, em dd/mm/aaaa.
+   *
+   * Tudo isto é conveniência: sem JavaScript, o campo de texto continua inteiro.
+   */
+  var ICONE_CALENDARIO =
+    '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.5" aria-hidden="true">' +
+    '<rect x="1.75" y="3.25" width="12.5" height="11" rx="2"/>' +
+    '<path d="M1.75 6.75h12.5M5.25 1.75v3M10.75 1.75v3"/></svg>';
+
+  function paraISO(texto) {
+    var partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec((texto || "").trim());
+    return partes ? partes[3] + "-" + partes[2] + "-" + partes[1] : "";
+  }
+
+  function paraBR(iso) {
+    var partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return partes ? partes[3] + "/" + partes[2] + "/" + partes[1] : "";
+  }
+
+  document.querySelectorAll('input[data-mascara="data"]').forEach(function (texto) {
+    if (texto.closest(".campo-data")) return;
+
+    var caixa = document.createElement("span");
+    caixa.className = "campo-data";
+    texto.parentNode.insertBefore(caixa, texto);
+    caixa.appendChild(texto);
+
+    // Sem `name`: quem envia a data é o campo de texto. Este existe só para
+    // abrir o calendário, e um segundo campo com o mesmo nome sobrescreveria
+    // o que foi digitado.
+    var nativo = document.createElement("input");
+    nativo.type = "date";
+    nativo.className = "campo-data__nativo";
+    nativo.tabIndex = -1;
+    nativo.setAttribute("aria-hidden", "true");
+    caixa.appendChild(nativo);
+
+    var botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "campo-data__abrir";
+    botao.innerHTML = ICONE_CALENDARIO;
+    botao.setAttribute("aria-label", "Escolher no calendário");
+    botao.title = "Escolher no calendário";
+    caixa.appendChild(botao);
+
+    botao.addEventListener("click", function () {
+      // Abre no dia que já está digitado, quando há um: rolar doze meses até
+      // achar de novo a data que a pessoa acabou de escrever é trabalho à toa.
+      nativo.value = paraISO(texto.value);
+
+      if (typeof nativo.showPicker === "function") {
+        try {
+          nativo.showPicker();
+          return;
+        } catch (erro) {
+          /* Navegador recusou abrir: caímos no clique comum, abaixo. */
+        }
+      }
+      nativo.focus();
+      nativo.click();
+    });
+
+    nativo.addEventListener("change", function () {
+      var escolhida = paraBR(nativo.value);
+      if (!escolhida) return;
+      texto.value = escolhida;
+      // O `input` avisa quem mais escuta o campo (máscara, validação da tela).
+      texto.dispatchEvent(new Event("input", { bubbles: true }));
+      texto.focus();
+    });
+  });
+
+  /*
    * Campos que só valem para certos tipos de documento: "qual documento"
    * aparece só para identificação; "data de emissão", só onde ela define
    * validade. O servidor revalida — isto aqui é só para não poluir a tela.

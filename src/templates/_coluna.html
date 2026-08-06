@@ -1,0 +1,12 @@
+{% comment %}
+  Cabeçalho de coluna que ordena a lista. Renderizado por `{% coluna %}`
+  (operacoes/templatetags/listagem.py): não monte o link à mão no template.
+
+  A seta é decorativa: quem a lê é o olho. Para leitor de tela quem informa é o
+  `aria-sort`, e repetir a informação faria a coluna ser anunciada duas vezes.
+{% endcomment %}
+<th{% if numero %} class="tabela__numero"{% endif %} aria-sort="{{ aria }}">
+  <a class="ordenar{% if direcao %} ordenar--ativa{% endif %}" href="{{ url }}">
+    {{ rotulo }}<span class="ordenar__seta" aria-hidden="true">{{ seta }}</span>
+  </a>
+</th>

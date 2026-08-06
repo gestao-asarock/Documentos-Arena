@@ -801,6 +801,161 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   (`-`). Docstring e comentário ficam de fora: são texto para quem lê o código.
   `tests/test_templates.py` varre os templates e, pelo `ast`, as strings do Python que não
   são docstring — o que passa a valer também para o código que ainda não existe.
+- **D58 — Poderes de correção do administrador.** Decisão de 06/08/2026, logo depois do
+  D57. Fechar o cadastro duplicado tapou um bug e, com ele, a única saída que existia para
+  dado errado em perfil já validado: editar estava travado pelo D47, cadastrar de novo
+  passou a estar travado pelo D57, e cancelar e refazer devolve o mesmo dado, agora
+  validado outra vez. Sem saída nenhuma, a próxima correção sairia por `UPDATE` no banco,
+  que não passa por auditoria. O administrador (papel `administrador` ou superusuário)
+  recebe duas saídas, e nenhuma delas é parte do fluxo:
+  - **Apagar registro, só o que já está cancelado.** Vale para perfil e para contrato.
+    Exigir o cancelamento antes não é burocracia: é o que obriga a passar pelas guardas do
+    cancelamento, que recusam encerrar registro com contrato em andamento. Sem isso,
+    apagar viraria atalho para furar aquelas regras.
+  - **Editar cadastro que o fluxo travou**, inclusive perfil validado ou cancelado, e
+    **sem reiniciar a validação**. O padrão é esse porque o caso de uso é engano de
+    digitação, não invalidar análise que já correu. Quando a intenção for a oposta, uma
+    caixa na tela pede a revalidação e aí a confirmação do D47 aparece normalmente.
+  - **O que a exclusão leva junto.** Perfil é folha: nada aponta para ele, e a contraparte,
+    o dossiê, os documentos e a habilitação **ficam** (são dela, não do cadastro, D29).
+    Contrato é diferente: `EtapaAprovacao` é `CASCADE`, então **somem as etapas e o texto
+    do parecer de cada decisão já tomada**. Isso é perda real e assumida; a tela conta
+    quantos pareceres vão embora antes do clique. O parecer de crédito sobrevive, só perde
+    o vínculo (`SET_NULL`), e os documentos também, porque são da contraparte.
+  - **A trilha fica, e é o que sobra.** O evento é gravado **antes** da exclusão, com ação
+    nova `EXCLUSAO_REGISTRO`, e a descrição precisa bastar sozinha: depois dela não há mais
+    objeto para o `GenericForeignKey` apontar. Nenhum registro de auditoria é apagado (§6).
+  - **Editar sem revalidar também vira evento**, com nome e sobrenome, e a marca de
+    alteração cadastral aparece no detalhe. Documento aprovado passando a atestar dado
+    diferente do que foi conferido é exatamente o tipo de coisa que não pode acontecer
+    calado.
+- **D57 — Um perfil por CPF/CNPJ.** Decisão de 06/08/2026. Nada impedia cadastrar duas
+  vezes a mesma contraparte, e o segundo cadastro nascia **validado de graça**: a
+  habilitação é da contraparte e era reaproveitada inteira (D19, D29). Ficavam duas
+  esteiras para a mesma pessoa, com o mesmo dossiê, e nenhuma das duas dizia que a outra
+  existia. Pior, o cadastro novo **sobrescrevia** nome, endereço e RG de uma contraparte já
+  validada, sem confirmação, sem auditoria e sem reiniciar a validação: era a porta lateral
+  do D47, que bloqueia a edição justamente nesse caso.
+  - O cadastro passa a ser **barrado na entrada** quando já existe perfil ativo com aquele
+    documento. A tela nomeia o perfil existente e leva até ele: para atualizar dados ou
+    trocar documento, o caminho é o perfil que já existe.
+  - **Perfil cancelado não barra.** Perfil cancelado não se edita (`pode_ser_editada`), e
+    bloquear nele deixaria o documento sem caminho nenhum, nem cadastro novo nem correção
+    do antigo. Cancelar e refazer continua sendo fluxo válido.
+  - **O bloqueio olha a base inteira, a tela não.** `perfil_ativo_de` ignora visibilidade,
+    ou bastaria não enxergar o perfil para duplicá-lo. Nomear o perfil na tela é decisão
+    separada: só quando quem cadastra pode mesmo abri-lo, senão o aviso vazaria a
+    existência de um registro que ela não pode listar e o link daria 404 (D35). Hoje
+    `criado_dentro_da_casa` deixa todo usuário da casa ver o que a casa cadastrou, então na
+    prática o aviso quase sempre traz o número; o caminho mudo existe para não depender
+    disso continuar verdade.
+  - `obter_ou_criar_contraparte` **não reescreve mais** contraparte que já existe: preenche
+    o que estava em branco e atualiza o contato (que nenhum documento atesta). O que os
+    documentos comprovam só muda pela edição do perfil, que confirma o efeito e reinicia a
+    validação (D47).
+  - A base tinha duplicatas de antes da regra. `python manage.py perfis_duplicados` mantém
+    um perfil por contraparte e **cancela** os demais, com motivo gravado; nada é apagado.
+    Sem `--aplicar` ele só relata. O comando não passa por `Solicitacao.cancelar`, de
+    propósito: aquele método recusa cancelar perfil de contraparte com contrato em
+    andamento, guarda que protege o **último** perfil, não o duplicado. O contrato aponta
+    para a contraparte, nunca para o perfil.
+  - O que o comando **não** resolve, e avisa: as filas de compliance e de crédito leem
+    `Habilitacao`, não `Solicitacao`. Habilitação aberta por um perfil duplicado continua na
+    fila depois de o perfil ser cancelado. Mexer nela seria inventar um parecer, então fica
+    para a área.
+- **D56 — Lista é ferramenta de trabalho: abas, filtros, ordenação e paginação.** Decisão de
+  05/08/2026. As duas telas de entrada eram uma tabela única, sem recorte: funcionava com
+  trinta registros e deixava de funcionar com trezentos, porque quem procurava um caso
+  específico rolava a página e quem precisava saber **o que travou** não tinha como
+  perguntar. Passam a ter: **abas por tipo de contrato** (só em Contratos), com contagem que
+  respeita os demais filtros, para a soma das abas bater com a tela; **filtros** de situação,
+  etapa da vez, faixa de valor, faixas de data (cadastro, evento e última movimentação),
+  "sem movimento há N dias", enquadramento, documentação, quem cadastrou, tipo de pessoa e
+  parte relacionada; **busca** por nome, CPF/CNPJ e número do registro, com autocomplete de
+  contraparte; **ordenação** por clique no cabeçalho; e **paginação de 25**.
+  Quatro regras não negociáveis:
+  1. **O recorte parte do que o usuário já vê.** Todo filtro se aplica sobre
+     `operacoes_visiveis_para` / `solicitacoes_visiveis_para`, nunca sobre o modelo. Filtrar
+     não pode ser porta lateral para alcançar registro de outro time (D35).
+  2. **Nada de filtro em Python.** Tudo o que recorta é coluna do banco. Decidir em memória
+     obrigaria a carregar a lista inteira a cada página, que é o problema que se quer
+     resolver, e faria a contagem descrever a página em vez da lista.
+  3. **A ordem vem de lista branca.** `arena.listagem.ordenar` só aceita as chaves que a tela
+     declarou; o resto da URL cai no padrão em silêncio. Sem isso, qualquer campo do modelo
+     (e das tabelas ligadas) vira ordenável pela barra de endereço. O desempate final é
+     sempre o id, ou duas linhas iguais trocam de lugar entre páginas e um registro some.
+  4. **O estado do filtro fica na URL, e só nela.** Nada de lembrar por usuário: a URL é
+     compartilhável, o botão "voltar" desfaz, e ninguém entra numa lista já recortada sem
+     saber por quê.
+  Duas propriedades passaram a existir **também em SQL**, e isso é dívida assumida:
+  `Operacao.etapa_atual` (`operacoes/consultas.com_etapa_atual`) e
+  `Solicitacao.situacao_da_validacao` (`solicitacoes/consultas.com_validacao`). São a mesma
+  regra escrita duas vezes; `test_etapa_atual_anotada.py` e `test_validacao_anotada.py`
+  comparam os dois caminhos e reprovam se discordarem. Ao mexer numa, mexa na outra.
+  O filtro de **documentação** do contrato não recalcula a exigência documental: "falta
+  documento" é o próprio `AGUARDANDO_DOCUMENTOS`, porque quem já fez essa conta foi a máquina
+  de estados. As demais opções olham os documentos vinculados ao contrato.
+  **O htmx entrou na `main`** por causa do autocomplete (2.0.4, servido de
+  `src/static/js/`, nunca de CDN), fechando a pendência que estava aberta. As sugestões saem
+  de `buscar_contrapartes_visiveis`, que deriva a permissão dos registros visíveis: sugerir
+  um nome que a pessoa não pode listar já vazaria que a contraparte existe. A lista de
+  destino sai de um mapa fixo (`LISTAS_COM_BUSCA`), nunca da URL.
+  **A linha da tabela de lista ficou mais alta** (`.tabela--lista`, 56px): linha fina
+  espremia perfil e contrato num rodapé de planilha, e o que está ali é o cadastro de uma
+  pessoa e um contrato assinado. As tabelas de etapas e de conferência seguem compactas,
+  porque ali comparar linhas vizinhas é o trabalho.
+  **Ajuste de acabamento (mesma data), depois de ver a barra rodando.** Três coisas saíram
+  dela:
+  - **Campo de formulário não pertence a `.formulario`.** Toda a estilização de `input`,
+    `select` e `textarea` estava presa a esse seletor, e a barra de filtros, que é outro
+    contêiner, caiu no padrão cru do navegador: borda fina, canto reto, 24px de altura.
+    Parecia página sem CSS, e era. As regras passaram a `:is(.formulario, .filtros)`, com a
+    lista de contêineres num lugar só. **Tela nova que colete dado entra nessa lista**, em
+    vez de copiar as regras ou de vestir o contêiner de `.formulario` só pelo estilo.
+  - **Dois raios, por escala.** `--raio` subiu para 8px (controle, botão, pastilha) e entrou
+    `--raio-caixa`, de 12px, para superfície grande: cartão, painel de filtros, tabela de
+    lista e login. Canto quase reto num painel de 1200px lê como acabamento pela metade; o
+    raio de um botão, aplicado àquela largura, some.
+  - **Altura de controle é 44px**, e o rótulo do filtro tem o mesmo peso do rótulo de
+    formulário. Densidade não pode custar a sensação de que o controle é clicável.
+  **Segundo ajuste (mesma data): o painel virou dois, e a data ganhou calendário.**
+  - **"Mais filtros" e "Filtros por data" abrem separados.** São oito campos de tempo, e
+    quase todos ficam vazios na maioria dos dias: no meio dos demais, dobravam a altura da
+    barra e escondiam o que se usa toda hora. `FiltroBase` os separa em `campos_gerais` e
+    `campos_de_data`, e **"sem movimento há N dias" vai com as datas** (`campos_de_tempo`):
+    é recorte de tempo como qualquer outro, e separá-lo das faixas obrigaria a procurar em
+    dois lugares. Cada painel **abre sozinho quando tem filtro em vigor** e mostra a
+    contagem, para ninguém precisar caçar de onde veio o recorte.
+  - **O campo de data é texto com máscara e calendário, os dois.** A digitação continua
+    valendo pelo motivo de D24: o seletor nativo não aceita data colada, e quem trabalha
+    copiando dado de outra tela ficava sem caminho. Mas digitar nem sempre é o mais rápido,
+    e o clique passou a existir: `formulario.js` põe ao lado do campo um
+    `input[type="date"]` **sem `name`**, invisível, que só abre o calendário nativo
+    (`showPicker()`), e escreve de volta em dd/mm/aaaa. Quem envia continua sendo o texto:
+    um segundo campo com o mesmo `name` sobrescreveria o que foi digitado. O
+    `input[type=date]` some por **opacidade, não por `display: none`** (assim escondido o
+    `showPicker()` do Chrome levanta erro), e sem JavaScript sobra o campo de texto inteiro.
+    Vale para **todo** campo `data-mascara="data"` do sistema, não só para os filtros.
+  - **Correção junto:** `campos_avancados` passou a excluir também `campos_fora_da_contagem`.
+    O tipo de contrato aparecia três vezes na mesma página com o mesmo `name` (aba, campo
+    escondido e select do painel), e o select sobrescrevia a aba escolhida.
+- **D55 — Documento fora do prazo avisa, não barra: quem decide é a triagem.** Decisão de
+  05/08/2026, a partir de um caso real. Um comprovante de residência de 189 dias foi
+  enviado (com o alerta de D48), o CRM o conferiu e **aprovou de propósito** — era um caso
+  retroativo, já ocorrido, e o comprovante da época serve. Mesmo assim o documento voltou
+  para "precisa de correção", em vermelho, com o rótulo "Aprovado" ao lado: `esta_vigente`
+  exigia estar dentro do prazo, então o dossiê desfazia em silêncio o parecer que acabara
+  de ser dado, e o perfil não saía da triagem. **O vencimento é insumo da decisão, não a
+  decisão.** Aprovar um documento já vencido grava `prazo_dispensado` em
+  `DocumentoCadastral`, e `esta_vigente` passa a ser "aprovado, e dentro do prazo **ou**
+  dispensado". A dispensa é do ato de conferir: documento que vence **depois** de aprovado
+  continua virando pendência (é o que sustenta a revalidação de D19), e rejeitar limpa a
+  marca, para que uma nova aprovação avalie o prazo de novo. Antes da decisão o documento
+  vencido fica **em análise**, não em "precisa de correção" — chamá-lo de problema
+  antecipava o parecer de quem tria. O aviso continua em toda parte: no envio, na tela de
+  conferência (dizendo que aprovar aceita assim mesmo) e junto do documento aprovado
+  ("aceito fora do prazo"). Nada disso vale para o **kit vencer por tempo** depois de
+  habilitada a contraparte: ali quem manda é D19 e o prazo da habilitação (P5).
 - **D54 — Ler o documento e levá-lo para assinar são downloads diferentes.** Decisão de
   05/08/2026. A tela de assinatura passou a listar os **documentos enviados pelo Clube**,
   baixáveis como foram enviados (`operacoes:baixar_documento`). Esse caminho é de leitura e

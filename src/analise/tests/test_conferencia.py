@@ -4,10 +4,13 @@ Conferência documental (AGENTS.md §4.6).
 O estado da habilitação é derivado do dossiê, nunca assumido.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from django.utils import timezone
 
 from analise.servicos import aprovar_documento, fila_de_conferencia, rejeitar_documento
 from contas.models import Papel, Usuario
@@ -173,3 +176,109 @@ def test_rejeicao_sem_motivo_pela_tela_nao_muda_nada(client, solicitacao, clube,
     documento.refresh_from_db()
 
     assert documento.status == StatusDocumento.ENVIADO
+
+
+# -- Documento fora do prazo (AGENTS.md D55) ---------------------------------
+
+
+def _com_prazo(tipo, dias_validade=90):
+    tipo.dias_validade = dias_validade
+    tipo.save()
+    return tipo
+
+
+def _enviar_vencido(solicitacao, tipo, usuario, *, dias_de_idade=189):
+    documento = _enviar(solicitacao, _com_prazo(tipo), usuario)
+    documento.data_emissao = timezone.localdate() - timedelta(days=dias_de_idade)
+    documento.save()
+    return documento
+
+
+def test_documento_vencido_ainda_nao_conferido_fica_em_analise(solicitacao, clube):
+    """Antes da decisão, o prazo é aviso: quem tria é que diz se passa."""
+    documento = _enviar_vencido(solicitacao, solicitacao.pendencias_cadastrais()[0], clube)
+
+    kit = solicitacao.contraparte.situacao_do_kit()
+
+    assert documento in kit["em_analise"]
+    assert documento not in kit["com_problema"]
+
+
+def test_aprovar_fora_do_prazo_vale_como_vigente(solicitacao, clube, compliance):
+    """O parecer é que decide: aprovado fora do prazo continua aprovado."""
+    documento = _enviar_vencido(solicitacao, solicitacao.pendencias_cadastrais()[0], clube)
+
+    aprovar_documento(documento, usuario=compliance)
+    documento.refresh_from_db()
+
+    assert documento.esta_vencido
+    assert documento.prazo_dispensado
+    assert documento.esta_vigente
+
+
+def test_documento_aceito_fora_do_prazo_sai_da_pendencia(client, solicitacao, clube, compliance):
+    """O caso relatado: aprovar devolvia o documento para 'precisa de correção'."""
+    tipo = solicitacao.pendencias_cadastrais()[0]
+    documento = _enviar_vencido(solicitacao, tipo, clube)
+    aprovar_documento(documento, usuario=compliance)
+
+    kit = solicitacao.contraparte.situacao_do_kit()
+
+    assert documento in kit["vigentes"]
+    assert documento not in kit["com_problema"]
+    assert tipo not in solicitacao.contraparte.pendencias_cadastrais()
+
+    client.force_login(clube)
+    corpo = client.get(reverse("solicitacoes:detalhe", args=[solicitacao.pk])).content.decode()
+    assert "Precisa de correção" not in corpo
+
+
+def test_kit_com_documento_aceito_fora_do_prazo_avanca(solicitacao, clube, compliance):
+    for indice, tipo in enumerate(list(solicitacao.pendencias_cadastrais())):
+        if indice == 0:
+            documento = _enviar_vencido(solicitacao, tipo, clube)
+        else:
+            documento = _enviar(solicitacao, tipo, clube)
+        aprovar_documento(documento, usuario=compliance)
+
+    solicitacao.habilitacao.refresh_from_db()
+
+    assert solicitacao.habilitacao.status == StatusHabilitacao.EM_COMPLIANCE
+
+
+def test_documento_que_vence_depois_de_aprovado_volta_a_ser_pendencia(
+    solicitacao, clube, compliance
+):
+    """A dispensa é da conferência daquele momento, não um passe permanente."""
+    tipo = _com_prazo(solicitacao.pendencias_cadastrais()[0])
+    documento = _enviar(solicitacao, tipo, clube)
+    documento.data_emissao = timezone.localdate()
+    documento.save()
+    aprovar_documento(documento, usuario=compliance)
+
+    documento.data_emissao = timezone.localdate() - timedelta(days=200)
+    documento.save()
+
+    assert not documento.esta_vigente
+    assert tipo in solicitacao.contraparte.pendencias_cadastrais()
+
+
+def test_rejeitar_desfaz_a_dispensa_de_prazo(solicitacao, clube, compliance):
+    documento = _enviar_vencido(solicitacao, solicitacao.pendencias_cadastrais()[0], clube)
+    aprovar_documento(documento, usuario=compliance)
+
+    rejeitar_documento(documento, usuario=compliance, motivo="Preciso de um mais recente.")
+    documento.refresh_from_db()
+
+    assert not documento.prazo_dispensado
+    assert not documento.esta_vigente
+
+
+def test_conferencia_avisa_do_prazo_sem_barrar(client, solicitacao, clube, compliance):
+    documento = _enviar_vencido(solicitacao, solicitacao.pendencias_cadastrais()[0], clube)
+    client.force_login(compliance)
+
+    corpo = client.get(reverse("analise:conferir", args=[documento.pk])).content.decode()
+
+    assert "fora do prazo" in corpo
+    assert "aprovar aceita o documento assim mesmo" in corpo.lower()

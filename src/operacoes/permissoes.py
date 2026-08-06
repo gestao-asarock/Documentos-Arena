@@ -64,6 +64,43 @@ def pode_cancelar(usuario, registro) -> bool:
     return eh_dono_ou_interno(usuario, registro)
 
 
+def eh_administrador(usuario) -> bool:
+    """Superusuário ou papel administrador.
+
+    É a régua dos **poderes de correção** (AGENTS.md D58): apagar registro
+    cancelado e editar cadastro que o fluxo normal já travou. Nenhum deles é
+    parte do fluxo; existem porque fluxo real tem engano, e sem uma saída o
+    engano vira intervenção no banco, que não passa por auditoria nenhuma.
+    """
+    if not usuario.is_authenticated:
+        return False
+    return usuario.is_superuser or usuario.tem_papel(Papel.ADMINISTRADOR)
+
+
+def pode_excluir(usuario, registro) -> bool:
+    """Apagar de vez: só o administrador, e só o que já está cancelado.
+
+    Cancelado primeiro não é burocracia: obriga a passar pelas guardas do
+    cancelamento, que recusam encerrar um registro com contrato em andamento.
+    Sem isso, apagar seria um atalho para furar aquelas regras.
+    """
+    return eh_administrador(usuario) and registro.esta_cancelada
+
+
+def pode_editar_perfil(usuario, solicitacao) -> bool:
+    """Quem pode alterar os dados cadastrais do perfil (AGENTS.md D47, D58).
+
+    Regra normal: quem abriu o registro ou a ASAROCK, e só enquanto a
+    contraparte não foi validada. O administrador passa por cima disso,
+    inclusive em perfil validado ou cancelado. É a contrapartida do D57: com o
+    cadastro duplicado barrado, um endereço errado em perfil já aprovado ficaria
+    sem nenhum conserto possível.
+    """
+    if not eh_dono_ou_interno(usuario, solicitacao):
+        return False
+    return eh_administrador(usuario) or solicitacao.pode_ser_editada
+
+
 def pode_criar_operacao(usuario) -> bool:
     """CRM cria operações; o Clube também, para seus próprios terceiros."""
     if not usuario.is_authenticated:

@@ -1,0 +1,33 @@
+{% comment %}
+Exclusão definitiva, só para administrador e só em registro já cancelado
+(AGENTS.md D58). Espera `url_excluir`, `rotulo` e `consequencia`.
+
+`etapas_decididas` é opcional: vem da tela do contrato e conta os pareceres que
+somem junto. A tela do perfil não a define, então a frase não aparece lá. O
+número fica aqui, e não no argumento do `include`, porque texto passado em
+`with` não é renderizado: um `{{ ... }}` ali sairia literal na tela.
+
+Diferente de `_cancelar.html`: ali o registro fica, aqui ele some. O que
+sobrevive é o evento na trilha de auditoria, gravado antes da exclusão (§6).
+{% endcomment %}
+<section class="cartao">
+  <h2>Excluir {{ rotulo }}</h2>
+  <p class="aviso aviso--erro">
+    Isto apaga o registro do banco e não tem volta. {{ consequencia }}
+    {% if etapas_decididas %}
+      Some também o parecer de {{ etapas_decididas }} etapa{{ etapas_decididas|pluralize }}
+      já decidida{{ etapas_decididas|pluralize }}.
+    {% endif %}
+  </p>
+  <p class="ajuda">
+    Fica na auditoria quem excluiu, quando e o quê. Se a intenção for só tirar da lista
+    de trabalho, o cancelamento já resolve: o registro some da esteira e continua existindo.
+  </p>
+  <form method="post" action="{{ url_excluir }}"
+        data-confirmar="Excluir {{ rotulo }} definitivamente? Esta ação não tem volta.">
+    {% csrf_token %}
+    <div class="acoes">
+      <button type="submit" class="botao botao--perigo">Excluir {{ rotulo }}</button>
+    </div>
+  </form>
+</section>

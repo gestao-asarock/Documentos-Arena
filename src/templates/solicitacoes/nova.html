@@ -10,6 +10,36 @@
     <p class="aviso aviso--erro">{{ form.non_field_errors|join:" " }}</p>
   {% endif %}
 
+  {% if bloqueado_por_duplicidade %}
+    {% comment %}
+      Um perfil por CPF/CNPJ (AGENTS.md D57). O link só aparece quando quem
+      cadastra enxerga o registro: se ele é de outro time, dizer o número e o
+      nome revelaria a existência de um cadastro que essa pessoa não pode listar.
+    {% endcomment %}
+    <div class="aviso aviso--erro">
+      {% if perfil_existente %}
+        <p>
+          Esta contraparte já tem cadastro: Perfil #{{ perfil_existente.pk }},
+          {{ perfil_existente.contraparte.nome }}.
+        </p>
+        <p class="ajuda">
+          Para atualizar os dados ou enviar documentos, use o perfil existente. Um segundo
+          cadastro criaria outra esteira para a mesma pessoa, com o mesmo dossiê.
+        </p>
+        <p>
+          <a class="botao botao--discreto" href="{% url 'solicitacoes:detalhe' perfil_existente.pk %}">
+            Abrir Perfil #{{ perfil_existente.pk }}
+          </a>
+        </p>
+      {% else %}
+        <p>Já existe um cadastro para este CPF/CNPJ, aberto por outra equipe.</p>
+        <p class="ajuda">
+          Procure quem cadastrou a contraparte para atualizar os dados ou os documentos.
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% comment %}
     `novalidate`: campo obrigatório escondido faz o navegador recusar o envio
     sem mostrar nada ("invalid form control is not focusable"). Quem aponta o

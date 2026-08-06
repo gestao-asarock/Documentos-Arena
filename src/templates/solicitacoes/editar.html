@@ -6,11 +6,32 @@
 <div class="pagina__topo"><h1>Editar dados do perfil #{{ solicitacao.pk }}</h1></div>
 
 <section class="cartao cartao--estreito">
-  {% if tem_analise_feita %}
-    {% comment %}
-      O aviso vem antes do formulário, não depois: quem lê só ao chegar no botão
-      já preencheu tudo e vai confirmar por inércia.
-    {% endcomment %}
+  {% comment %}
+    O aviso vem antes do formulário, não depois: quem lê só ao chegar no botão
+    já preencheu tudo e vai confirmar por inércia.
+
+    Administrador e usuário comum leem avisos diferentes porque a mesma tela faz
+    coisas diferentes para os dois (AGENTS.md D58): para o fluxo normal, mexer no
+    que os documentos comprovam recomeça a validação; para o administrador, não
+    recomeça nada, a menos que ele peça na caixa lá embaixo.
+  {% endcomment %}
+  {% if como_administrador %}
+    <p class="aviso aviso--atencao aviso--forte" role="alert">
+      <span class="aviso__marca" aria-hidden="true">&#9888;</span>
+      <span class="aviso__corpo">
+        <strong class="aviso__titulo">Edição de administrador</strong>
+        {% if fora_do_fluxo_normal %}
+          Este perfil está {% if solicitacao.esta_cancelada %}cancelado{% else %}validado{% endif %}
+          e o fluxo normal não permitiria alterá-lo. Você pode porque é administrador.<br>
+        {% endif %}
+        A validação <strong>não recomeça</strong>: os documentos aprovados continuam
+        valendo e vão passar a atestar dados diferentes dos que foram conferidos.
+        Se a intenção for justamente refazer a conferência, marque a caixa no fim do
+        formulário.<br>
+        A alteração fica na auditoria com o seu nome, e aparece marcada no perfil.
+      </span>
+    </p>
+  {% elif tem_analise_feita %}
     <p class="aviso aviso--atencao aviso--forte" role="alert">
       <span class="aviso__marca" aria-hidden="true">&#9888;</span>
       <span class="aviso__corpo">
@@ -63,6 +84,22 @@
         {% include "_campo.html" %}
       {% endfor %}
     </div>
+
+    {% if como_administrador and tem_analise_feita %}
+      <h2 class="secao-formulario">Validação</h2>
+      <div class="campo">
+        <label for="revalidar">
+          <input type="checkbox" id="revalidar" name="revalidar" value="1"
+                 {% if revalidar_marcado %}checked{% endif %}>
+          Reiniciar a validação depois de salvar
+        </label>
+        <small class="ajuda">
+          Devolve os documentos aprovados para a triagem e manda compliance e crédito
+          serem refeitos. Deixe desmarcado para só corrigir o cadastro. Marcando, a
+          próxima tela mostra o que muda e o que isso desfaz antes de gravar.
+        </small>
+      </div>
+    {% endif %}
 
     <div class="acoes">
       <button type="submit" class="botao botao--grande">Salvar alterações</button>

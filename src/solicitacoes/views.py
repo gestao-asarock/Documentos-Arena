@@ -8,7 +8,9 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
+from arena.listagem import ordenar, paginar
 from auditoria.servicos import Acao, registrar
 from contrapartes.models import ArquivoDocumento, DocumentoCadastral
 from contrapartes.servicos import (
@@ -20,48 +22,171 @@ from contrapartes.servicos import (
 )
 from documentos.models import StatusDocumento
 from integracoes.enderecos import buscar_por_cep
-from operacoes.permissoes import eh_dono_ou_interno, pode_cancelar, pode_criar_operacao
+from operacoes.permissoes import (
+    eh_administrador,
+    eh_dono_ou_interno,
+    pode_cancelar,
+    pode_criar_operacao,
+    pode_editar_perfil,
+    pode_excluir,
+)
 
 from . import fluxo as fluxo_do_processo
+from .consultas import com_validacao
+from .filtros import COLUNAS, ORDEM_PADRAO, FiltroPerfis
 from .forms import EdicaoPerfilForm, EnvioDocumentoForm, SolicitacaoForm
 from .models import Solicitacao
-from .servicos import abrir_habilitacao, obter_ou_criar_contraparte, solicitacoes_visiveis_para
+from .servicos import (
+    abrir_habilitacao,
+    buscar_contrapartes_visiveis,
+    obter_ou_criar_contraparte,
+    perfil_ativo_de,
+    solicitacoes_visiveis_para,
+)
+
+#: As listas que têm busca com autocomplete. O nome da rota nunca vem da URL do
+#: pedido: sem esse mapa, `origem` viraria um link para onde quem chamasse
+#: quisesse, dentro de uma página nossa.
+LISTAS_COM_BUSCA = {
+    "perfis": "solicitacoes:lista",
+    "contratos": "operacoes:lista",
+}
+
+#: Sugestão é atalho, não relatório: passando de oito a lista deixa de caber na
+#: tela e a pessoa volta a ler linha a linha.
+LIMITE_DE_SUGESTOES = 8
 
 
 @login_required
 def lista(request):
-    solicitacoes = solicitacoes_visiveis_para(request.user)
+    """Lista de perfis com filtros, ordenação e paginação.
+
+    Filtrar, ordenar e só então paginar: a página é o último recorte, ou a
+    contagem passa a descrever a página em vez da lista.
+    """
+    visiveis = com_validacao(solicitacoes_visiveis_para(request.user))
+    filtro = FiltroPerfis(request.GET, visiveis=visiveis)
+
+    encontrados, ordem = ordenar(
+        filtro.aplicar(visiveis),
+        request.GET.get("ordem", ""),
+        colunas=COLUNAS,
+        padrao=ORDEM_PADRAO,
+    )
+    pagina = paginar(
+        encontrados.select_related("contraparte", "habilitacao"), request.GET.get("pagina")
+    )
+
     return render(
         request,
         "solicitacoes/lista.html",
-        {"solicitacoes": solicitacoes, "pode_criar": pode_criar_operacao(request.user)},
+        {
+            "pagina": pagina,
+            "solicitacoes": pagina.object_list,
+            "total": pagina.paginator.count,
+            "filtro": filtro,
+            "ordem": ordem,
+            "pode_criar": pode_criar_operacao(request.user),
+        },
+    )
+
+
+@login_required
+def buscar_contrapartes(request):
+    """Sugestões de contraparte para a busca das listas (AGENTS.md D56).
+
+    Devolve um pedaço de HTML, não JSON: quem consome é o htmx, que troca o
+    conteúdo da caixa de sugestões. Cada sugestão é um **link** para a mesma
+    lista com `contraparte` fixada, preservando os outros filtros que vieram
+    junto no pedido; sem JavaScript nenhum a busca por texto continua servindo.
+
+    As sugestões saem do que o usuário já pode ver. Oferecer um nome que ele não
+    tem permissão de listar vazaria a existência da contraparte, e clicar nele
+    devolveria tela vazia.
+    """
+    termo = request.GET.get("busca", "").strip()
+    origem = request.GET.get("origem", "")
+    destino = reverse(LISTAS_COM_BUSCA.get(origem, "solicitacoes:lista"))
+
+    # Uma letra casa com quase tudo: a lista de sugestões viraria a lista inteira.
+    encontradas = (
+        buscar_contrapartes_visiveis(request.user, termo)[:LIMITE_DE_SUGESTOES]
+        if len(termo) >= 2
+        else []
+    )
+
+    # O link da sugestão leva os filtros em vigor: escolher a contraparte é um
+    # recorte a mais, não um recomeço. `pagina` sai porque o resultado é outro.
+    parametros = request.GET.copy()
+    for chave in ("busca", "origem", "pagina", "contraparte"):
+        parametros.pop(chave, None)
+
+    sugestoes = []
+    for contraparte in encontradas:
+        parametros["contraparte"] = str(contraparte.pk)
+        sugestoes.append({"contraparte": contraparte, "url": f"{destino}?{parametros.urlencode()}"})
+
+    return render(
+        request,
+        "solicitacoes/_sugestoes.html",
+        {"sugestoes": sugestoes, "termo": termo, "buscou": len(termo) >= 2},
     )
 
 
 @login_required
 def nova(request):
+    """Cadastra o perfil, **um por CPF/CNPJ** (AGENTS.md D57).
+
+    Documento que já tem perfil ativo não abre um segundo: a contraparte é uma
+    só, o dossiê é dela e a validação também. Cadastrar de novo criava uma
+    segunda esteira para a mesma pessoa, e o perfil novo nascia validado de
+    graça, herdando a habilitação da primeira (D19, D29). Para atualizar dados
+    ou trocar documento, o caminho é o perfil existente.
+    """
     if not pode_criar_operacao(request.user):
         raise PermissionDenied
 
     form = SolicitacaoForm(request.POST or None)
+    ja_existe = None
 
     if request.method == "POST" and form.is_valid():
-        contraparte, _ = obter_ou_criar_contraparte(
-            documento=form.cleaned_data["documento"], dados=form.dados_da_contraparte
-        )
-        solicitacao = Solicitacao.objects.create(contraparte=contraparte, criada_por=request.user)
-        registrar(
-            acao=Acao.CRIACAO,
-            descricao=f"Perfil #{solicitacao.pk} cadastrado",
-            objeto=solicitacao,
-            usuario=request.user,
-        )
-        abrir_habilitacao(solicitacao, usuario=request.user)
+        ja_existe = perfil_ativo_de(form.cleaned_data["documento"])
+        if ja_existe is None:
+            contraparte, _ = obter_ou_criar_contraparte(
+                documento=form.cleaned_data["documento"], dados=form.dados_da_contraparte
+            )
+            solicitacao = Solicitacao.objects.create(
+                contraparte=contraparte, criada_por=request.user
+            )
+            registrar(
+                acao=Acao.CRIACAO,
+                descricao=f"Perfil #{solicitacao.pk} cadastrado",
+                objeto=solicitacao,
+                usuario=request.user,
+            )
+            abrir_habilitacao(solicitacao, usuario=request.user)
 
-        messages.success(request, f"Perfil #{solicitacao.pk} cadastrado.")
-        return redirect("solicitacoes:detalhe", pk=solicitacao.pk)
+            messages.success(request, f"Perfil #{solicitacao.pk} cadastrado.")
+            return redirect("solicitacoes:detalhe", pk=solicitacao.pk)
 
-    return render(request, "solicitacoes/nova.html", {"form": form})
+        form.add_error("documento", "Já existe um cadastro de perfil para este CPF/CNPJ.")
+
+    return render(
+        request,
+        "solicitacoes/nova.html",
+        {
+            "form": form,
+            "bloqueado_por_duplicidade": ja_existe is not None,
+            # Só oferece o link se quem cadastra puder mesmo abrir o registro.
+            # Apontar para um perfil de outro time revelaria a existência dele,
+            # e o link levaria a um 404 (AGENTS.md D35).
+            "perfil_existente": (
+                solicitacoes_visiveis_para(request.user).filter(pk=ja_existe.pk).first()
+                if ja_existe is not None
+                else None
+            ),
+        },
+    )
 
 
 @login_required
@@ -75,7 +200,7 @@ def editar(request, pk: int):
     solicitacao = get_object_or_404(solicitacoes_visiveis_para(request.user), pk=pk)
     if not eh_dono_ou_interno(request.user, solicitacao):
         raise PermissionDenied
-    if not solicitacao.pode_ser_editada:
+    if not pode_editar_perfil(request.user, solicitacao):
         messages.error(
             request,
             "Perfil validado ou cancelado não pode ter os dados alterados."
@@ -84,24 +209,34 @@ def editar(request, pk: int):
         )
         return redirect("solicitacoes:detalhe", pk=pk)
 
+    # O administrador edita o que o fluxo normal trava, e por padrão **sem**
+    # reiniciar a validação (AGENTS.md D58): a edição dele é para corrigir
+    # engano de digitação, não para invalidar análise que já correu. Quando ele
+    # quiser o contrário, a caixa na tela pede a revalidação de propósito.
+    como_administrador = eh_administrador(request.user)
+    revalidar_por_escolha = bool(request.POST.get("revalidar"))
+
     contraparte = solicitacao.contraparte
     form = EdicaoPerfilForm(
         request.POST or None, initial=EdicaoPerfilForm.dados_iniciais(contraparte)
     )
 
+    contexto = {
+        "solicitacao": solicitacao,
+        "contraparte": contraparte,
+        "form": form,
+        # A tela só avisa que a validação recomeça se houver o que recomeçar.
+        "tem_analise_feita": contraparte.documentos_cadastrais.exists(),
+        "como_administrador": como_administrador,
+        # O aviso de poder excepcional só faz sentido onde o fluxo normal barra.
+        "fora_do_fluxo_normal": como_administrador and not solicitacao.pode_ser_editada,
+        "revalidar_marcado": revalidar_por_escolha,
+    }
+
     # "Voltar e corrigir" na confirmação: devolve o formulário com o que foi
     # digitado, em vez de recarregar o que está no banco.
     if request.method == "POST" and request.POST.get("voltar"):
-        return render(
-            request,
-            "solicitacoes/editar.html",
-            {
-                "solicitacao": solicitacao,
-                "contraparte": contraparte,
-                "form": form,
-                "tem_analise_feita": contraparte.documentos_cadastrais.exists(),
-            },
-        )
+        return render(request, "solicitacoes/editar.html", contexto)
 
     if request.method == "POST" and form.is_valid():
         previa = comparar_cadastro(contraparte, form.dados_da_contraparte)
@@ -110,18 +245,25 @@ def editar(request, pk: int):
             messages.info(request, "Nada foi alterado.")
             return redirect("solicitacoes:detalhe", pk=pk)
 
+        # Quem decide se a validação recomeça: para o fluxo normal, a natureza do
+        # campo alterado; para o administrador, a escolha dele na tela (D58).
+        # Sem habilitação não há o que reiniciar, e `reiniciar_validacao` não
+        # aceita nula: perfil nesse estado só chega aqui por dado antigo, mas
+        # atender com erro 500 seria a pior forma de descobrir isso.
+        pediu_revalidar = revalidar_por_escolha if como_administrador else previa.exige_revalidacao
+        vai_revalidar = pediu_revalidar and solicitacao.habilitacao_id is not None
+
         # Alteração que derruba a conferência passa por uma confirmação própria,
         # que mostra o que muda e o que isso desfaz. Só depois dela se grava: o
-        # efeito é grande demais para caber num aviso lido depois do fato.
+        # efeito é grande demais para caber num aviso lido depois do fato. Sem
+        # revalidação não há o que desfazer, e a confirmação seria só um clique.
         veio_da_confirmacao = bool(request.POST.get("confirmado"))
-        if previa.exige_revalidacao and not (veio_da_confirmacao and request.POST.get("ciente")):
+        if vai_revalidar and not (veio_da_confirmacao and request.POST.get("ciente")):
             return render(
                 request,
                 "solicitacoes/editar_confirmar.html",
                 {
-                    "solicitacao": solicitacao,
-                    "contraparte": contraparte,
-                    "form": form,
+                    **contexto,
                     "previa": previa,
                     "efeitos": efeitos_da_revalidacao(solicitacao.habilitacao),
                     # Só é falta de ciência se a pessoa já esteve nesta tela e
@@ -134,7 +276,7 @@ def editar(request, pk: int):
             contraparte, form.dados_da_contraparte, usuario=request.user
         )
 
-        if alteracao.exige_revalidacao:
+        if vai_revalidar:
             reiniciar_validacao(
                 solicitacao.habilitacao,
                 usuario=request.user,
@@ -145,22 +287,31 @@ def editar(request, pk: int):
                 f"Dados alterados ({alteracao.resumo}). A validação recomeçou: "
                 "os documentos voltaram para a triagem e as análises serão refeitas.",
             )
+        elif alteracao.exige_revalidacao:
+            # Mudou o que os documentos comprovam e nada foi refeito. Isto não
+            # pode acontecer em silêncio: fica na trilha, com nome e sobrenome,
+            # e a marca de alteração aparece no detalhe para quem for conferir.
+            registrar(
+                acao=Acao.ALTERACAO_CADASTRAL,
+                descricao=(
+                    f"Perfil #{solicitacao.pk}: administrador alterou {alteracao.resumo} "
+                    f"sem reiniciar a validação"
+                ),
+                objeto=solicitacao,
+                usuario=request.user,
+            )
+            messages.warning(
+                request,
+                f"Dados alterados ({alteracao.resumo}) sem reiniciar a validação. "
+                "Os documentos aprovados continuam valendo e agora atestam dados "
+                "diferentes dos que foram conferidos.",
+            )
         else:
             messages.success(request, f"Dados alterados ({alteracao.resumo}).")
 
         return redirect("solicitacoes:detalhe", pk=pk)
 
-    return render(
-        request,
-        "solicitacoes/editar.html",
-        {
-            "solicitacao": solicitacao,
-            "contraparte": contraparte,
-            "form": form,
-            # A tela só avisa que a validação recomeça se houver o que recomeçar.
-            "tem_analise_feita": contraparte.documentos_cadastrais.exists(),
-        },
-    )
+    return render(request, "solicitacoes/editar.html", contexto)
 
 
 @login_required
@@ -186,8 +337,12 @@ def detalhe(request, pk: int):
             "fluxo": fluxo_do_processo.montar(solicitacao),
             "pode_cancelar": solicitacao.pode_ser_cancelada
             and pode_cancelar(request.user, solicitacao),
-            "pode_editar": solicitacao.pode_ser_editada
-            and eh_dono_ou_interno(request.user, solicitacao),
+            "pode_editar": pode_editar_perfil(request.user, solicitacao),
+            # Poder de correção do administrador (D58): a tela precisa dizer que
+            # a edição está fora do fluxo normal, senão parece rotina.
+            "edicao_excepcional": eh_administrador(request.user)
+            and not solicitacao.pode_ser_editada,
+            "pode_excluir": pode_excluir(request.user, solicitacao),
             "exigencias": solicitacao.exigencias_cadastrais(),
             "pendencias": pendencias,
             "kit": solicitacao.contraparte.situacao_do_kit(),
@@ -260,7 +415,7 @@ def enviar_documento(request, pk: int):
             request,
             f"{documento.rotulo} enviado, mas está fora do prazo: emitido há "
             f"{documento.dias_desde_emissao} dias, e vale {documento.tipo.dias_validade}. "
-            "A triagem provavelmente vai pedir um mais recente.",
+            "A triagem decide se aceita assim mesmo ou pede um mais recente.",
         )
     else:
         messages.success(request, f"{documento.rotulo} enviado. Aguardando análise.")
@@ -292,6 +447,46 @@ def cancelar(request, pk: int):
     )
     messages.success(request, f"Solicitação #{solicitacao.pk} cancelada.")
     return redirect("solicitacoes:detalhe", pk=pk)
+
+
+@login_required
+def excluir(request, pk: int):
+    """Apaga de vez um perfil cancelado (AGENTS.md D58). Só o administrador.
+
+    O que sai é o **cadastro**, e só ele. A contraparte fica, com o dossiê, os
+    documentos e a habilitação: eles são dela, não deste registro (D29), e
+    contrato antigo continua apontando para ela. Apagar o perfil não recomeça
+    ninguém do zero, e a tela precisa dizer isso antes do clique.
+
+    O evento de auditoria é gravado **antes** da exclusão, e é o que sobra do
+    registro: depois dele não há mais objeto para apontar (AGENTS.md §6).
+    """
+    if request.method != "POST":
+        return redirect("solicitacoes:detalhe", pk=pk)
+
+    solicitacao = get_object_or_404(solicitacoes_visiveis_para(request.user), pk=pk)
+    if not pode_excluir(request.user, solicitacao):
+        raise PermissionDenied
+
+    numero, contraparte = solicitacao.pk, solicitacao.contraparte
+    registrar(
+        acao=Acao.EXCLUSAO_REGISTRO,
+        # Sem CPF/CNPJ: a descrição vai para a trilha e não guarda dado pessoal
+        # (AGENTS.md §6). O id da contraparte basta para reencontrar quem era.
+        descricao=(
+            f"Perfil #{numero} excluído pelo administrador. "
+            f"Contraparte #{contraparte.pk} mantida, com dossiê e habilitação"
+        ),
+        objeto=solicitacao,
+        usuario=request.user,
+    )
+    solicitacao.delete()
+
+    messages.success(
+        request,
+        f"Perfil #{numero} excluído. A contraparte, os documentos e a validação continuam.",
+    )
+    return redirect("solicitacoes:lista")
 
 
 @login_required

@@ -16,6 +16,10 @@ class Acao(models.TextChoices):
     ENQUADRAMENTO = "enquadramento", "Enquadramento"
     ENVIO_DOCUMENTO = "envio_documento", "Envio de documento"
     EXCLUSAO_DOCUMENTO = "exclusao_documento", "Exclusão de documento"
+    #: Perfil ou contrato apagado do banco pelo administrador (AGENTS.md D58).
+    #: O registro some; este evento é o que sobra dele, e por isso a descrição
+    #: precisa bastar por si só.
+    EXCLUSAO_REGISTRO = "exclusao_registro", "Exclusão de registro"
     ALTERACAO_CADASTRAL = "alteracao_cadastral", "Alteração cadastral"
     ANALISE_IA = "analise_ia", "Análise por IA"
     CONSULTA_COMPLIANCE = "consulta_compliance", "Consulta de compliance"

@@ -62,14 +62,26 @@ def _perfil_de(documento: DocumentoCadastral):
 
 @transaction.atomic
 def aprovar_documento(documento: DocumentoCadastral, *, usuario, observacao: str = ""):
-    """Aceita o documento e reavalia se o dossiê ficou completo."""
+    """Aceita o documento e reavalia se o dossiê ficou completo.
+
+    Aprovar um documento já fora do prazo é aceitá-lo assim mesmo: a dispensa fica
+    gravada, com quanto tempo tinha, para o dossiê não o devolver à pendência logo
+    em seguida (AGENTS.md D55).
+    """
     documento.status = StatusDocumento.APROVADO
     documento.observacao = observacao
+
+    fora_do_prazo = documento.esta_vencido
+    if fora_do_prazo:
+        documento.prazo_dispensado = True
     documento.save()
 
+    descricao = f"{documento.rotulo} aprovado na conferência documental"
+    if fora_do_prazo:
+        descricao += f", fora do prazo (emitido há {documento.dias_desde_emissao} dias)"
     registrar(
         acao=Acao.APROVACAO,
-        descricao=f"{documento.rotulo} aprovado na conferência documental",
+        descricao=descricao,
         objeto=documento,
         usuario=usuario,
     )
@@ -98,6 +110,9 @@ def rejeitar_documento(documento: DocumentoCadastral, *, usuario, motivo: str):
 
     documento.status = StatusDocumento.REJEITADO
     documento.observacao = motivo
+    # Rejeitar desfaz a dispensa: se este documento voltar a ser aprovado, o prazo
+    # é avaliado de novo, na conferência daquele momento.
+    documento.prazo_dispensado = False
     documento.save()
 
     registrar(

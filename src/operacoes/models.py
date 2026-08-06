@@ -261,6 +261,11 @@ class Operacao(models.Model):
         self.status = novo_status
 
     @property
+    def esta_cancelada(self) -> bool:
+        """Mesmo nome que em `Solicitacao`: a régua de exclusão serve aos dois."""
+        return self.status == StatusOperacao.CANCELADA
+
+    @property
     def pode_ser_cancelada(self) -> bool:
         return self.status not in ESTADOS_QUE_NAO_CANCELAM
 
@@ -363,8 +368,12 @@ class Operacao(models.Model):
                 faltando.append(tipo)
             elif any(d.esta_vigente for d in documentos):
                 aprovados.extend(d for d in documentos if d.esta_vigente)
-            elif any(d.status in recusados or d.esta_vencido for d in documentos):
-                # Rejeitado ou vencido é problema a corrigir, não algo em curso.
+            elif any(
+                d.status in recusados or (d.esta_vencido and not d.em_analise) for d in documentos
+            ):
+                # Rejeitado é problema a corrigir. Vencido só depois de conferido:
+                # antes disso quem decide se o prazo passa é a triagem (AGENTS.md D55),
+                # e chamar de "precisa de correção" antecipava a decisão dela.
                 com_problema.extend(documentos)
             else:
                 em_analise.extend(documentos)

@@ -35,7 +35,9 @@
   <div class="pagina__topo">
     <h2>Dados do perfil</h2>
     {% if pode_editar %}
-      <a class="botao botao--discreto" href="{% url 'solicitacoes:editar' solicitacao.pk %}">Editar dados</a>
+      <a class="botao botao--discreto" href="{% url 'solicitacoes:editar' solicitacao.pk %}">
+        {% if edicao_excepcional %}Editar como administrador{% else %}Editar dados{% endif %}
+      </a>
     {% elif not solicitacao.esta_cancelada %}
       <span class="ajuda">Perfil validado: os dados não podem mais ser alterados.</span>
     {% endif %}
@@ -71,7 +73,7 @@
   <h2>Kit cadastral</h2>
   <p class="ajuda">
     Documentos base exigidos para {{ contraparte.get_tipo_pessoa_display|lower }}.
-    Documentos vencidos voltam a ser pendência.
+    Documento fora do prazo é sinalizado; aceitá-lo assim mesmo é decisão da conferência.
   </p>
 
   {% if kit.faltando %}
@@ -131,7 +133,15 @@
       {% for documento in kit.vigentes %}
         <li class="lista-kit__item">
           <span class="estado estado--sucesso">&#10003; Aprovado</span>
-          <span>{{ documento.rotulo }}</span>
+          <span class="lista-kit__nome">
+            {{ documento.rotulo }}
+            {% if documento.prazo_dispensado %}
+              <small class="ajuda">
+                Aceito fora do prazo na conferência: emitido há
+                {{ documento.dias_desde_emissao }} dias, vale {{ documento.tipo.dias_validade }}.
+              </small>
+            {% endif %}
+          </span>
         </li>
       {% endfor %}
     </ul>
@@ -193,7 +203,13 @@
             <td>
               {% if documento.data_vencimento %}
                 {{ documento.data_vencimento|data_br }}
-                {% if documento.esta_vencido %}<span class="estado estado--atencao">&#9888; vencido</span>{% endif %}
+                {% if documento.esta_vencido %}
+                  {% if documento.prazo_dispensado %}
+                    <span class="estado estado--atencao">&#9888; vencido, aceito na conferência</span>
+                  {% else %}
+                    <span class="estado estado--atencao">&#9888; vencido</span>
+                  {% endif %}
+                {% endif %}
               {% else %}não vence{% endif %}
             </td>
             <td>{{ documento.enviado_por|default:"-" }} <small class="ajuda">{{ documento.data_envio|data_hora_br }}</small></td>
@@ -215,6 +231,10 @@
       {% if solicitacao.motivo_cancelamento %}<br>Motivo: {{ solicitacao.motivo_cancelamento }}{% endif %}
     </p>
   </section>
+  {% if pode_excluir %}
+    {% url 'solicitacoes:excluir' solicitacao.pk as url_excluir %}
+    {% include "_excluir.html" with url_excluir=url_excluir rotulo="perfil" consequencia="A contraparte continua existindo, com os documentos, o dossiê e a validação: eles são dela, não deste cadastro. Contratos antigos não são afetados." %}
+  {% endif %}
 {% elif pode_cancelar %}
   {% url 'solicitacoes:cancelar' solicitacao.pk as url_cancelar %}
   {% include "_cancelar.html" with url_cancelar=url_cancelar rotulo="solicitação" %}

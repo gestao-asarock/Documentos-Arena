@@ -1,0 +1,84 @@
+{% load listagem %}{% comment %}
+  Barra de filtros das listas. Espera `filtro` (um arena.filtros.FiltroBase) e
+  `origem` ("perfis" ou "contratos"), que diz ao autocomplete para onde apontar.
+
+  O formulário é GET de propósito: o recorte fica na URL, dá para colar no chat
+  da equipe e o botão "voltar" do navegador desfaz o filtro.
+
+  `pagina` não é reenviado: mudar o filtro devolve a lista para a primeira
+  página, ou a pessoa filtra e cai numa página que já não existe.
+{% endcomment %}
+<form class="filtros" method="get" role="search">
+  <input type="hidden" name="origem" value="{{ origem }}">
+  {% if filtro.tipo.value %}<input type="hidden" name="tipo" value="{{ filtro.tipo.value }}">{% endif %}
+
+  <div class="filtros__linha">
+    <div class="filtros__busca">
+      <label class="filtros__rotulo" for="{{ filtro.busca.id_for_label }}">{{ filtro.busca.label }}</label>
+      {{ filtro.busca }}
+      {{ filtro.contraparte }}
+      {% comment %}
+        As sugestões chegam do servidor conforme se digita. Sem JavaScript esta
+        caixa fica vazia e a busca por texto continua funcionando pelo botão.
+      {% endcomment %}
+      <div class="sugestoes" id="sugestoes-{{ origem }}"
+           hx-get="{% url 'solicitacoes:buscar_contrapartes' %}"
+           hx-trigger="keyup changed delay:250ms from:#{{ filtro.busca.id_for_label }}"
+           hx-include="closest form"
+           hx-target="this"></div>
+    </div>
+
+    <button type="submit" class="botao">Filtrar</button>
+    {% if filtro.tem_filtro %}
+      {% comment %}
+        Limpar apaga os filtros, não a navegação: a aba de tipo e a ordenação
+        escolhida continuam de pé.
+      {% endcomment %}
+      <a class="botao botao--discreto" href="{% url_apenas_com "tipo" "ordem" %}">Limpar filtros</a>
+    {% endif %}
+  </div>
+
+  {% if filtro.resumo %}
+    <ul class="etiquetas" aria-label="Filtros aplicados">
+      {% for item in filtro.resumo %}
+        <li class="etiqueta">
+          <span class="etiqueta__campo">{{ item.rotulo }}:</span> {{ item.texto }}
+          <a class="etiqueta__sair" href="{% url_sem item.campo %}"
+             aria-label="Remover o filtro {{ item.rotulo }}">×</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% comment %}
+    Dois painéis, e não um. Os filtros de data são oito campos que ficam vazios
+    na maioria dos dias: junto dos demais, dobravam a altura da barra e
+    escondiam o que se usa toda hora. Cada painel abre sozinho quando tem filtro
+    em vigor, para ninguém precisar caçar de onde veio o recorte.
+  {% endcomment %}
+  <div class="filtros__paineis">
+    <details class="filtros__mais"{% if filtro.filtros_gerais %} open{% endif %}>
+      <summary>
+        Mais filtros
+        {% if filtro.filtros_gerais %}<span class="filtros__contagem">{{ filtro.filtros_gerais }}</span>{% endif %}
+      </summary>
+      <div class="filtros__grade">
+        {% for campo in filtro.campos_gerais %}
+          {% include "_campo.html" with campo=campo %}
+        {% endfor %}
+      </div>
+    </details>
+
+    <details class="filtros__mais"{% if filtro.filtros_de_data %} open{% endif %}>
+      <summary>
+        Filtros por data
+        {% if filtro.filtros_de_data %}<span class="filtros__contagem">{{ filtro.filtros_de_data }}</span>{% endif %}
+      </summary>
+      <div class="filtros__grade">
+        {% for campo in filtro.campos_de_data %}
+          {% include "_campo.html" with campo=campo %}
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+</form>

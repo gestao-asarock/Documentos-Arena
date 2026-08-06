@@ -17,5 +17,9 @@ urlpatterns = [
         name="excluir_documento",
     ),
     path("<int:pk>/cancelar/", views.cancelar, name="cancelar"),
+    path("<int:pk>/excluir/", views.excluir, name="excluir"),
     path("cep/", views.buscar_cep, name="buscar_cep"),
+    # Sugestões da busca das listas de perfis e de contratos. Fica aqui, e não
+    # em cada app, porque a resposta é a mesma nos dois casos.
+    path("contrapartes/buscar/", views.buscar_contrapartes, name="buscar_contrapartes"),
 ]

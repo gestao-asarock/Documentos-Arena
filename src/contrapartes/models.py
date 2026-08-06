@@ -350,6 +350,14 @@ class DocumentoCadastral(models.Model):
         "contas.Usuario", on_delete=models.PROTECT, null=True, blank=True
     )
     observacao = models.TextField("observação", blank=True)
+    prazo_dispensado = models.BooleanField(
+        "prazo dispensado na conferência",
+        default=False,
+        help_text=(
+            "Marcado quando a conferência aprova um documento que já estava fora do "
+            "prazo. O vencimento avisa; quem decide é o parecer humano."
+        ),
+    )
 
     class Meta:
         verbose_name = "documento cadastral"
@@ -400,11 +408,20 @@ class DocumentoCadastral(models.Model):
 
     @property
     def esta_vigente(self) -> bool:
-        """Vale para compor o dossiê: aprovado e dentro do prazo.
+        """Vale para compor o dossiê: aprovado, e dentro do prazo ou dispensado.
 
         Estar completo não é estar aprovado — são estados distintos (AGENTS.md §4.5).
+
+        Vencimento **avisa, não barra**: quem confere pode aceitar um comprovante
+        antigo de propósito, como no lançamento retroativo de um caso já ocorrido.
+        Antes, o documento voltava sozinho para "precisa de correção" logo depois de
+        aprovado, contrariando a decisão que acabara de ser tomada (AGENTS.md D55).
+        A dispensa é gravada na aprovação, então documento que vence *depois* de
+        aprovado continua virando pendência, como sempre.
         """
-        return self.status == StatusDocumento.APROVADO and not self.esta_vencido
+        if self.status != StatusDocumento.APROVADO:
+            return False
+        return self.prazo_dispensado or not self.esta_vencido
 
 
 class ArquivoDocumento(models.Model):

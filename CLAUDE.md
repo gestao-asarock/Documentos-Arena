@@ -221,6 +221,11 @@ O prazo sai de `TipoDocumento.dias_validade`, nunca de constante no código. **S
 cadastral:** o envio de documento do contrato não pede a data, porque ali o documento nasce
 junto com o contrato e a emissão é sempre hoje.
 
+> **Vencido não reprova sozinho** (AGENTS.md D55). Quem aprova ou reprova é a triagem.
+> Aprovar documento já fora do prazo grava `prazo_dispensado` e ele vale para o dossiê;
+> antes da decisão ele fica **em análise**, não em "precisa de correção". Documento que
+> vence *depois* de aprovado continua virando pendência, e rejeitar limpa a dispensa.
+
 **Selo de validação some quando o perfil é cancelado**: vira "Cancelada" em cinza. Mostrar
 "Aguardando documentos" num cadastro encerrado sugeria que alguém ainda esperava algo. A
 regra está em `Solicitacao.situacao_da_validacao`, e `VALIDACAO_NAO_SE_APLICA` entrou no
@@ -281,6 +286,54 @@ acontece **uma vez, na esteira do perfil**; o contrato não a refaz (AGENTS.md D
 
 > **Dívida conhecida:** o app ainda se chama `solicitacoes`, mas hospeda os **perfis**.
 > Renomear para `perfis` quando houver um momento tranquilo — mexe em migrations.
+
+**Um perfil por CPF/CNPJ** (AGENTS.md D57). Documento que já tem perfil ativo não abre um
+segundo: a tela nomeia o perfil existente e leva até ele. Antes, o cadastro repetido criava
+outra esteira para a mesma pessoa e ela **nascia validada**, herdando a habilitação da
+primeira. Perfil **cancelado não barra** — cancelado não se edita, então bloquear ali
+travaria o documento para sempre. `servicos.perfil_ativo_de` é o ponto único da regra e
+olha a base inteira, sem filtro de visibilidade (senão bastaria não enxergar o perfil para
+duplicá-lo); quem decide se o número pode aparecer na tela é a view, porque apontar para um
+registro invisível vazaria a existência dele e o link daria 404 (D35).
+
+> **`obter_ou_criar_contraparte` não reescreve contraparte que já existe.** Só preenche
+> campo em branco e atualiza contato. Sem essa guarda, cadastrar de novo o mesmo CPF/CNPJ
+> com outro nome trocava o nome de uma contraparte **já validada**, sem confirmação e sem
+> auditoria: era a porta lateral do D47, que bloqueia a edição exatamente nesse caso.
+
+**O administrador tem dois poderes de correção** (AGENTS.md D58), e nenhum deles é fluxo:
+**apagar** registro já cancelado (perfil ou contrato) e **editar** cadastro que o fluxo
+travou, inclusive validado ou cancelado, **sem reiniciar a validação**. A régua está em
+`operacoes/permissoes.py`: `eh_administrador`, `pode_excluir` e `pode_editar_perfil`.
+Existem porque o D57 fechou a gambiarra que servia de saída, e sem saída a próxima correção
+sairia por `UPDATE` no banco, longe de qualquer auditoria.
+
+> **Exigir cancelamento antes de apagar não é burocracia.** É o que obriga a passar pelas
+> guardas do cancelamento, que recusam encerrar registro com contrato em andamento. Apagar
+> direto seria um atalho para furar aquelas regras.
+
+> **Apagar contrato leva as etapas junto** (`EtapaAprovacao` é `CASCADE`), e com elas o
+> texto do parecer de cada decisão tomada. Perda real e assumida: a tela conta quantos
+> pareceres somem antes do clique. Perfil não tem esse problema, é folha, e a contraparte,
+> o dossiê e a habilitação ficam. Nos dois casos o evento de auditoria é gravado **antes**
+> da exclusão, com a ação nova `EXCLUSAO_REGISTRO` (migration `auditoria/0005`), porque
+> depois dela não há mais objeto para o `GenericForeignKey` apontar.
+
+Editar sem revalidar é o **padrão** do administrador, não um descuido: o caso de uso é
+corrigir digitação. Quando ele quiser o contrário, a caixa "Reiniciar a validação" no fim
+do formulário faz a confirmação do D47 aparecer normalmente. Ela **não** é campo do
+formulário, então `editar_confirmar.html` a carrega adiante num `hidden` próprio; sem isso
+o segundo POST gravaria sem reiniciar nada. E editar sem revalidar gera evento na trilha
+com nome e sobrenome, porque documento aprovado passando a atestar dado diferente do que
+foi conferido não pode acontecer calado.
+
+**Duplicatas antigas se limpam por comando:** `python manage.py perfis_duplicados` relata,
+e com `--aplicar` mantém um perfil por contraparte e **cancela** os demais (nada é apagado).
+Ele não usa `Solicitacao.cancelar` de propósito: aquele método recusa cancelar perfil de
+contraparte com contrato em andamento, guarda que protege o **último** perfil, não o
+duplicado. O que ele não resolve, e avisa na saída: as filas de compliance e de crédito leem
+`Habilitacao`, não `Solicitacao`, então habilitação aberta por um duplicado continua na fila
+depois do cancelamento. Mexer nela seria inventar parecer.
 
 **Dossiê da tela de assinatura** (`operacoes/dossie.py`): a tela lista os **documentos
 enviados pelo Clube** em duas seções — os deste contrato e o **kit cadastral do perfil** —,
@@ -343,9 +396,57 @@ frágil, **é ali que se trabalha agora**.
 > primária. Sem isso o Django gera uma migration corretiva no `makemigrations` seguinte
 > (foi o que produziu `0003_alter_habilitacao_id` e companhia — inofensivas, mas ruído).
 
-**Pendência conhecida:** baixar `htmx.min.js` para `src/static/js/` quando a primeira tela
-precisar de interatividade. Nada de CDN. (Já baixado na branch `feat/triagem-ia`, versão
-2.0.4 — dá para trazer só esse arquivo se alguma tela de fluxo precisar antes.)
+**Listas de trabalho: abas, filtros, ordenação e paginação** (AGENTS.md D56). `/perfis` e
+`/operacoes/` deixaram de ser uma tabela única. Contratos ganharam **abas por tipo**, com
+contagem que já considera os outros filtros; as duas ganharam busca (nome, CPF/CNPJ e
+`#número`) com **autocomplete de contraparte**, filtros de situação, etapa da vez, valor,
+datas, "sem movimento há N dias", quem cadastrou e parte relacionada, ordenação por clique
+no cabeçalho e **25 por página**.
+
+O mecanismo é compartilhado: `arena/listagem.py` (ordem em lista branca + paginação),
+`arena/filtros.py` (base das duas barras) e `operacoes/templatetags/listagem.py` (as tags
+`coluna`, `url_com`, `url_sem`, `url_apenas_com`, `url_da_pagina`). As barras concretas
+ficam em `operacoes/filtros.py` e `solicitacoes/filtros.py`, e a tela em `_filtros.html`,
+`_coluna.html` e `_paginacao.html`.
+
+> **Filtro sai do queryset visível, e nunca decide em Python.** Todo recorte parte de
+> `operacoes_visiveis_para` / `solicitacoes_visiveis_para` e vira `WHERE`. Filtrar em memória
+> quebraria a paginação e faria a contagem descrever a página, não a lista. **Ordem só pelas
+> chaves declaradas em `COLUNAS`** (o resto da URL cai no padrão), sempre com desempate pelo
+> id. **O estado do filtro fica só na URL:** nada de lembrar por usuário.
+
+> **Duas regras agora existem em Python e em SQL.** `Operacao.etapa_atual` tem par em
+> `operacoes/consultas.com_etapa_atual`; `Solicitacao.situacao_da_validacao`, em
+> `solicitacoes/consultas.com_validacao`. Mexeu numa, mexa na outra:
+> `test_etapa_atual_anotada.py` e `test_validacao_anotada.py` comparam os dois caminhos.
+
+> Cuidado que já custou um bug: `entre_datas` escolhe entre `campo__date__gte` e
+> `campo__gte` pelo **tipo do campo**. `data_criacao` guarda hora e precisa do `__date`;
+> `data_evento` é data pura e com `__date` levanta `FieldError`. E busca por `#12` procura
+> **só** o registro 12: sem isso, "12" casava com quase todo CNPJ da base.
+
+**O painel de filtros é dois:** "Mais filtros" e "Filtros por data", cada um abrindo
+sozinho quando tem recorte em vigor e mostrando a contagem. A divisão sai de
+`campos_gerais` / `campos_de_data` em `arena/filtros.py`; "sem movimento há N dias" conta
+como data (`campos_de_tempo`).
+
+**Data se digita e também se clica.** `formulario.js` põe, ao lado de todo campo
+`data-mascara="data"`, um `input[type="date"]` **sem `name`** e invisível, só para abrir o
+calendário nativo, escrevendo de volta em dd/mm/aaaa. Quem envia é sempre o campo de texto
+(D24: o seletor nativo não aceita data colada). Dois cuidados: **não dê `name` ao campo
+nativo** e **não o esconda com `display: none`** (assim o `showPicker()` do Chrome falha).
+
+> **Estilo de campo vale para `:is(.formulario, .filtros)`, não só para `.formulario`.**
+> A barra de filtros nasceu fora dessa classe e todo controle dela veio cru do navegador:
+> fino, quadrado, 24px de altura. Tela nova que colete dado **entra nessa lista de
+> contêineres** em `base.css`; não copie as regras nem vista o contêiner de `.formulario`
+> só para herdar estilo. Junto disso: `--raio` é 8px (controle, botão, pastilha) e
+> `--raio-caixa` é 12px (cartão, painel de filtros, tabela de lista, login), e altura de
+> controle é 44px.
+
+**htmx entrou na `main`** (2.0.4, `src/static/js/htmx.min.js`, servido daqui e nunca de
+CDN), trazido da `feat/triagem-ia` para o autocomplete da busca. A pendência que estava
+aberta está fechada.
 
 **Próximo passo:** robustez do fluxo, não integração (D42). O que entra aqui sai de
 conversa com o responsável — não presuma a lista.

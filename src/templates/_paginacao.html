@@ -1,0 +1,25 @@
+{% load listagem %}{% comment %}
+  Navegação entre páginas. Espera `pagina` (um Page do Django).
+
+  Mostra sempre a contagem total, mesmo com uma página só: é ela que responde
+  "quantos registros o filtro devolveu?", que é a pergunta de quem filtrou.
+{% endcomment %}
+{% if pagina.paginator.num_pages > 1 %}
+  <nav class="paginacao" aria-label="Páginas">
+    {% if pagina.has_previous %}
+      <a class="botao botao--discreto" href="{% url_da_pagina pagina.previous_page_number %}">Anterior</a>
+    {% else %}
+      <span class="botao botao--discreto botao--inativo" aria-disabled="true">Anterior</span>
+    {% endif %}
+
+    <span class="paginacao__posicao">
+      Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}
+    </span>
+
+    {% if pagina.has_next %}
+      <a class="botao botao--discreto" href="{% url_da_pagina pagina.next_page_number %}">Próxima</a>
+    {% else %}
+      <span class="botao botao--discreto botao--inativo" aria-disabled="true">Próxima</span>
+    {% endif %}
+  </nav>
+{% endif %}

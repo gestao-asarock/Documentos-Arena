@@ -71,6 +71,15 @@
     os dados extraídos e as evidências aparecem aqui; a decisão continua sendo sua.
   </p>
 
+  {% if documento.esta_vencido %}
+    <p class="aviso aviso--atencao">
+      &#9888; Documento <strong>fora do prazo</strong>: emitido há
+      {{ documento.dias_desde_emissao }} dias, vale {{ documento.tipo.dias_validade }}.
+      O prazo não barra a decisão: aprovar aceita o documento assim mesmo, e a dispensa
+      fica registrada. Se o caso pede um documento mais recente, rejeite dizendo isso.
+    </p>
+  {% endif %}
+
   <form method="post" action="{% url 'analise:decidir' documento.pk %}" class="formulario">
     {% csrf_token %}
     <div class="campo">
