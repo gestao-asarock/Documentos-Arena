@@ -92,9 +92,7 @@ def _validar(contraparte, usuario) -> Habilitacao:
             arquivo=SimpleUploadedFile("documento.pdf", PDF),
             nome_original="documento.pdf",
         )
-    return Habilitacao.objects.create(
-        contraparte=contraparte, status=StatusHabilitacao.HABILITADA
-    )
+    return Habilitacao.objects.create(contraparte=contraparte, status=StatusHabilitacao.HABILITADA)
 
 
 # -- Exclusão -----------------------------------------------------------------
@@ -231,7 +229,7 @@ def test_admin_pode_pedir_a_revalidacao(client, admin, perfil, clube):
 
     # Primeiro POST cai na confirmação, sem gravar.
     confirmacao = client.post(reverse("solicitacoes:editar", args=[perfil.pk]), dados)
-    assert "editar_confirmar.html" in [t.name for t in confirmacao.templates]
+    assert "solicitacoes/editar_confirmar.html" in [t.name for t in confirmacao.templates]
     perfil.contraparte.refresh_from_db()
     assert perfil.contraparte.cidade == "São Paulo"
 
@@ -251,7 +249,9 @@ def test_admin_pode_pedir_a_revalidacao(client, admin, perfil, clube):
 
 def test_a_confirmacao_carrega_a_escolha_adiante(client, admin, perfil, clube):
     """Sem o hidden, o segundo POST gravaria sem revalidar: o oposto do pedido."""
-    _validar(perfil.contraparte, clube)
+    # A habilitação precisa estar ligada ao perfil: sem ela não há o que
+    # reiniciar, a view pula a confirmação e grava direto (a guarda em `editar`).
+    perfil.habilitacao = _validar(perfil.contraparte, clube)
     perfil.status = StatusSolicitacao.PRONTA_PARA_CONTRATO
     perfil.save()
     client.force_login(admin)
@@ -262,6 +262,24 @@ def test_a_confirmacao_carrega_a_escolha_adiante(client, admin, perfil, clube):
     )
 
     assert 'name="revalidar"' in resposta.content.decode()
+
+
+def test_pedir_revalidacao_sem_habilitacao_avisa_em_vez_de_calar(client, admin, perfil, clube):
+    """Sem habilitação não há o que reiniciar, e o sucesso mudo enganaria."""
+    _validar(perfil.contraparte, clube)
+    perfil.habilitacao = None
+    perfil.save()
+    client.force_login(admin)
+
+    resposta = client.post(
+        reverse("solicitacoes:editar", args=[perfil.pk]),
+        {**DADOS, "cidade": "Santos", "revalidar": "1"},
+        follow=True,
+    )
+
+    perfil.contraparte.refresh_from_db()
+    assert perfil.contraparte.cidade == "Santos"
+    assert any("Não havia validação em curso" in str(m) for m in resposta.context["messages"])
 
 
 def test_clube_continua_barrado_em_perfil_validado(client, clube, perfil):

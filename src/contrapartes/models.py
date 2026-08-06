@@ -22,6 +22,8 @@ from documentos.models import (
     TipoPessoa,
 )
 
+from .codigo import CARACTERES, formatar_codigo, gerar_codigo
+
 
 def deduzir_tipo_pessoa(documento: str) -> str:
     """CPF (11 dígitos) ou CNPJ (14). O usuário não escolhe — o documento diz.
@@ -62,6 +64,11 @@ class Contraparte(models.Model):
     nome_fantasia = models.CharField(max_length=200, blank=True)
     documento = models.CharField(
         "CPF/CNPJ", max_length=18, unique=True, help_text="Somente dígitos."
+    )
+    #: Identificador público, derivado do CPF/CNPJ por HMAC (AGENTS.md D59).
+    #: Não é editável: quem o define é o documento, e o documento nunca muda.
+    codigo = models.CharField(
+        "código", max_length=CARACTERES, unique=True, editable=False, blank=True
     )
 
     # Dados declarados no formulário — é contra eles que a IA confronta os
@@ -127,7 +134,17 @@ class Contraparte(models.Model):
         self.documento = apenas_digitos(self.documento)
         if not self.tipo_pessoa:
             self.tipo_pessoa = deduzir_tipo_pessoa(self.documento)
+        # Recalculado a cada gravação, e não só na criação: o código é função do
+        # documento, o documento não muda (D47), então isto é barato e garante
+        # que os dois nunca fiquem fora de sincronia, inclusive em registro
+        # criado por caminho que não passou por aqui.
+        self.codigo = gerar_codigo(self.documento)
         super().save(*args, **kwargs)
+
+    @property
+    def codigo_formatado(self) -> str:
+        """`K7M4-2QX9-BT5R`. Existe para o Admin e para `__str__`; a tela usa o filtro."""
+        return formatar_codigo(self.codigo)
 
     @property
     def eh_pj(self) -> bool:

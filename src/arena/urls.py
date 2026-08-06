@@ -1,8 +1,9 @@
 from django.contrib import admin
 from django.urls import include, path
 
-admin.site.site_header = "Documentos Arena"
-admin.site.site_title = "Documentos Arena"
+admin.site.site_header = "Portal de Documentação do FII ARENA"
+# Curto no `site_title`: ele vai para a aba do navegador, que corta o texto longo.
+admin.site.site_title = "FII ARENA"
 admin.site.index_title = "Administração"
 
 urlpatterns = [

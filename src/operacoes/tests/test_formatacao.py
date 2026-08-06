@@ -6,7 +6,13 @@ from decimal import Decimal
 import pytest
 from django.utils import timezone
 
-from operacoes.templatetags.formatacao import cpf_cnpj, data_br, data_hora_br, moeda
+from operacoes.templatetags.formatacao import (
+    cpf_cnpj,
+    data_br,
+    data_hora_br,
+    moeda,
+    moeda_sem_quebra,
+)
 
 
 @pytest.mark.parametrize(
@@ -68,3 +74,34 @@ def test_cpf_cnpj(valor, esperado):
 def test_documento_torto_aparece_como_esta():
     """Cadastro errado precisa ficar visível para ser corrigido, não sumir."""
     assert cpf_cnpj("12345") == "12345"
+
+
+def test_moeda_sem_quebra_cola_o_simbolo_ao_numero():
+    """Em coluna estreita a linha quebrava entre "R$" e o valor, parecendo defeito."""
+    assert (
+        moeda_sem_quebra("Evento até R$ 5.000,00")
+        == "Evento até R$\N{NO-BREAK SPACE}5.000,00"
+    )
+
+
+def test_moeda_sem_quebra_preserva_o_espaco_entre_palavras():
+    """Só o par símbolo e número fica junto: o resto do texto quebra normalmente."""
+    resultado = moeda_sem_quebra("Evento até R$ 5.000,00")
+
+    assert resultado.startswith("Evento até ")
+    assert resultado.count("\N{NO-BREAK SPACE}") == 1
+
+
+@pytest.mark.parametrize("texto", ["", None, "sem valor nenhum"])
+def test_moeda_sem_quebra_nao_inventa_nada(texto):
+    assert "\N{NO-BREAK SPACE}" not in moeda_sem_quebra(texto)
+
+
+def test_moeda_continua_com_espaco_comum():
+    """`solicitacoes/campos.py` faz `removeprefix("R$ ")` na saída do `moeda`.
+
+    Trocar aquele espaço por um fixo deixaria "R$" sobrando dentro do campo de
+    texto do formulário, que é por isso que a correção não foi feita no `moeda`.
+    """
+    assert moeda(Decimal("1234.56")) == "R$ 1.234,56"
+    assert moeda(Decimal("1234.56")).removeprefix("R$ ") == "1.234,56"

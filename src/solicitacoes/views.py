@@ -287,19 +287,31 @@ def editar(request, pk: int):
                 f"Dados alterados ({alteracao.resumo}). A validação recomeçou: "
                 "os documentos voltaram para a triagem e as análises serão refeitas.",
             )
-        elif alteracao.exige_revalidacao:
+            return redirect("solicitacoes:detalhe", pk=pk)
+
+        if alteracao.exige_revalidacao:
             # Mudou o que os documentos comprovam e nada foi refeito. Isto não
-            # pode acontecer em silêncio: fica na trilha, com nome e sobrenome,
-            # e a marca de alteração aparece no detalhe para quem for conferir.
+            # pode acontecer em silêncio: fica na trilha (o autor vai no campo
+            # `usuario`) e a marca de alteração aparece no detalhe.
             registrar(
                 acao=Acao.ALTERACAO_CADASTRAL,
                 descricao=(
-                    f"Perfil #{solicitacao.pk}: administrador alterou {alteracao.resumo} "
+                    f"Perfil #{solicitacao.pk}: {alteracao.resumo} alterado "
                     f"sem reiniciar a validação"
                 ),
                 objeto=solicitacao,
                 usuario=request.user,
             )
+
+        if pediu_revalidar:
+            # Pediu e não havia habilitação para reiniciar. Um sucesso mudo aqui
+            # faria a pessoa sair achando que a conferência foi refeita.
+            messages.warning(
+                request,
+                f"Dados alterados ({alteracao.resumo}). Não havia validação em curso "
+                "para reiniciar, então nada foi devolvido para a triagem.",
+            )
+        elif alteracao.exige_revalidacao:
             messages.warning(
                 request,
                 f"Dados alterados ({alteracao.resumo}) sem reiniciar a validação. "

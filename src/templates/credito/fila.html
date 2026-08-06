@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load formatacao %}
 
-{% block titulo %}Análise de crédito | Documentos Arena{% endblock %}
+{% block titulo %}Análise de crédito{% endblock %}
 
 {% block conteudo %}
 <div class="pagina__topo">
@@ -33,6 +33,7 @@
             <a href="{% url 'credito:parecer_perfil' habilitacao.pk %}">
               {{ habilitacao.contraparte.nome }}
             </a>
+            <small class="ajuda">{{ habilitacao.contraparte.codigo|codigo_contraparte }}</small>
           </td>
           <td>{{ habilitacao.contraparte.documento|cpf_cnpj }}</td>
           <td>{{ habilitacao.contraparte.get_tipo_pessoa_display }}</td>

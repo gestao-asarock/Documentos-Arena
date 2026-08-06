@@ -128,6 +128,16 @@ a:hover { text-decoration-thickness: 2px; }
   font-size: 17px;
   color: #fff;
   text-decoration: none;
+  white-space: nowrap;
+}
+/*
+ * "Portal de Documentação do FII ARENA" tem 35 caracteres e divide a barra com
+ * até cinco links de navegação. Abaixo desta largura o prefixo sai e sobra
+ * "FII ARENA": o brasão ao lado já identifica a casa, e navegação espremida
+ * atrapalha mais que nome por extenso ajuda.
+ */
+@media (max-width: 1100px) {
+  .cabecalho__nome-longo { display: none; }
 }
 /*
  * O brasão tem contorno preto e fica sobre o grafite do cabeçalho, onde se
@@ -272,7 +282,16 @@ a:hover { text-decoration-thickness: 2px; }
 .linha-clicavel a { color: inherit; text-decoration: none; font-weight: 500; }
 .linha-clicavel:hover a { color: var(--cor-primaria); }
 .linha-clicavel:focus-within { background: var(--cor-selecao); }
-.tabela__numero { text-align: right; font-variant-numeric: tabular-nums; }
+/*
+ * `nowrap` porque a coluna é estreita e "R$ 1.600,00" quebrava entre o símbolo e
+ * o número, com cara de defeito de renderização. Valor é uma unidade só: ou cabe
+ * inteiro, ou a coluna cresce.
+ */
+.tabela__numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /*
  * Numa lista de etapas, o olho procura uma coisa só: qual é a da vez. Ela

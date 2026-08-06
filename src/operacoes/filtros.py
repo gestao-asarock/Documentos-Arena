@@ -15,6 +15,7 @@ from django import forms
 from django.db.models import Count, Exists, OuterRef, Q
 
 from arena.filtros import OPCOES_SIM_NAO, FiltroBase, SelecaoMultipla, partes_da_busca
+from contrapartes.codigo import normalizar_codigo
 from contrapartes.models import DocumentoCadastral
 from documentos.models import StatusDocumento
 from solicitacoes.campos import DataBRField, MoedaBRField
@@ -141,6 +142,10 @@ class FiltroOperacoes(FiltroBase):
             condicao |= Q(pk=numero)
         if digitos:
             condicao |= Q(contraparte__documento__contains=digitos)
+        # Mesma razão da lista de perfis: o código serve para procurar, não só
+        # para ler na tela (AGENTS.md D59).
+        if codigo := normalizar_codigo(termo):
+            condicao |= Q(contraparte__codigo=codigo)
 
         return condicao
 

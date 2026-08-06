@@ -1,5 +1,5 @@
 """
-Configuração do Documentos Arena.
+Configuração do Portal de Documentação do FII ARENA.
 
 Tudo que varia entre ambientes vem de variável de ambiente (ver .env.example).
 Nunca escreva credencial neste arquivo — AGENTS.md §6.
@@ -9,6 +9,7 @@ from pathlib import Path
 
 import environ
 from django.contrib.messages import constants as message_constants
+from django.core.exceptions import ImproperlyConfigured
 
 # src/arena/settings.py → SRC_DIR = src/ ; BASE_DIR = raiz do repositório.
 SRC_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +28,15 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
+
+# Chave do código público da contraparte (AGENTS.md D59). Separada da
+# `SECRET_KEY` de propósito: aquela pode ser girada quando vazar, esta não pode
+# ser girada nunca, porque trocaria o código de todas as contrapartes.
+HASH_KEY = env("HASH_KEY")
+if not HASH_KEY:
+    # Vazia é pior que ausente: o HMAC continuaria funcionando, com chave nula,
+    # e os códigos passariam a ser deriváveis por qualquer um.
+    raise ImproperlyConfigured("HASH_KEY não pode ser vazia. Veja o .env.example.")
 
 # --- Aplicações -------------------------------------------------------------
 

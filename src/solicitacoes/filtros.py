@@ -13,6 +13,7 @@ from django import forms
 from django.db.models import Q
 
 from arena.filtros import OPCOES_SIM_NAO, FiltroBase, SelecaoMultipla, partes_da_busca
+from contrapartes.codigo import normalizar_codigo
 from contrapartes.models import StatusHabilitacao, TipoPessoa
 
 from .models import VALIDACAO_NAO_SE_APLICA, StatusSolicitacao
@@ -79,7 +80,7 @@ class FiltroPerfis(FiltroBase):
     )
 
     def condicao_de_busca(self, termo: str) -> Q:
-        """Número do perfil, nome, nome fantasia ou CPF/CNPJ da contraparte."""
+        """Número do perfil, nome, nome fantasia, CPF/CNPJ ou código da contraparte."""
         condicao = Q(contraparte__nome__icontains=termo) | Q(
             contraparte__nome_fantasia__icontains=termo
         )
@@ -89,6 +90,12 @@ class FiltroPerfis(FiltroBase):
             condicao |= Q(pk=numero)
         if digitos:
             condicao |= Q(contraparte__documento__contains=digitos)
+        # Mostrar um identificador que ninguém consegue procurar seria meia
+        # funcionalidade: quem recebe o código por telefone chega por aqui
+        # (AGENTS.md D59). `normalizar_codigo` só devolve algo com o tamanho
+        # exato, então CPF e CNPJ não caem nesta cláusula.
+        if codigo := normalizar_codigo(termo):
+            condicao |= Q(contraparte__codigo=codigo)
 
         return condicao
 

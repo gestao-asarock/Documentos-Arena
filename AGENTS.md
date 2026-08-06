@@ -1,4 +1,4 @@
-# AGENTS.md — Documentos Arena
+# AGENTS.md — Portal de Documentação do FII ARENA
 
 Documento de referência para qualquer agente de IA ou pessoa que escreva código neste
 repositório. Ele define **o que estamos construindo**, **como construímos** e
@@ -801,6 +801,34 @@ Decisões tomadas com o responsável pelo projeto. **Não reabra sem perguntar.*
   (`-`). Docstring e comentário ficam de fora: são texto para quem lê o código.
   `tests/test_templates.py` varre os templates e, pelo `ast`, as strings do Python que não
   são docstring — o que passa a valer também para o código que ainda não existe.
+- **D59 — Código público da contraparte, derivado do CPF/CNPJ.** Decisão de 06/08/2026.
+  A contraparte ganha um identificador de doze caracteres (`K7M4-2QX9-BT5R`) para aparecer
+  na tela no lugar de um número sequencial.
+  - **É HMAC, não hash.** Hash puro do CPF não protegeria nada: o espaço de CPF válido é da
+    ordem de 10^9 e uma tabela pré-calculada o reverte em segundos. Com **chave secreta**
+    (`HASH_KEY`, no `.env`) essa tabela não existe. E isto **não é anonimização**: dois
+    registros com o mesmo código são visivelmente a mesma pessoa, que é a propriedade
+    desejada. O que se evita é o caminho de volta ao CPF.
+  - **Fica na `Contraparte`, não no perfil.** O código é função do CPF/CNPJ, então dois
+    perfis da mesma pessoa calculariam o mesmo valor e nenhum `unique` sobreviveria a isso.
+    Some-se que o perfil é descartável (D57 permite recadastrar depois de cancelar, D58
+    permite apagar o cancelado) enquanto a contraparte é durável, e que **contrato aponta
+    para contraparte, nunca para perfil**. Perfil e contrato seguem com o `pk` sequencial,
+    que é número de protocolo e não tem problema a resolver.
+  - **Doze caracteres, 60 bits, base32 de Crockford** (sem I, L, O e U, que se confundem
+    com 1 e 0 ao ditar). Com cem mil contrapartes a colisão fica na casa de 10^-9, e ainda
+    assim seria detectada pelo `unique=True`, nunca silenciosa. Oito caracteres já dariam
+    colisão perceptível; dezesseis ninguém dita ao telefone.
+  - **A chave nunca rotaciona.** Girá-la trocaria o código de todas as contrapartes. Ela é
+    separada da `SECRET_KEY` justamente porque aquela **pode** ser girada. Como o valor
+    fica **gravado** na coluna, perder a chave custa só a capacidade de recalcular, não os
+    códigos já emitidos. `HASH_KEY` vazia derruba a inicialização: com chave nula o HMAC
+    continuaria funcionando e os códigos voltariam a ser deriváveis por qualquer um.
+  - **Onde aparece:** detalhe do perfil, telas e filas de compliance e de crédito, e o
+    Admin. **E se procura por ele** nas duas listas e no Admin, aceitando com hífen e em
+    minúscula: exibir um identificador que ninguém consegue buscar seria meia
+    funcionalidade. O tamanho separa código de documento, então CPF (11) e CNPJ (14) nunca
+    caem na cláusula do código.
 - **D58 — Poderes de correção do administrador.** Decisão de 06/08/2026, logo depois do
   D57. Fechar o cadastro duplicado tapou um bug e, com ele, a única saída que existia para
   dado errado em perfil já validado: editar estava travado pelo D47, cadastrar de novo

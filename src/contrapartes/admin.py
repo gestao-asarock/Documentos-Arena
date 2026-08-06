@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from .codigo import normalizar_codigo
 from .models import ArquivoDocumento, Contraparte, DocumentoCadastral, Habilitacao
 
 
@@ -20,10 +21,35 @@ class DocumentoCadastralInline(admin.TabularInline):
 
 @admin.register(Contraparte)
 class ContraparteAdmin(admin.ModelAdmin):
-    list_display = ("nome", "documento", "tipo_pessoa", "parte_relacionada", "ativa")
+    list_display = (
+        "nome",
+        "codigo_formatado",
+        "documento",
+        "tipo_pessoa",
+        "parte_relacionada",
+        "ativa",
+    )
     list_filter = ("tipo_pessoa", "parte_relacionada", "ativa")
-    search_fields = ("nome", "nome_fantasia", "documento")
+    # O código também se busca: é por ele que alguém vai chegar aqui vindo de um
+    # e-mail ou de um telefonema, sem ter o CPF/CNPJ à mão (AGENTS.md D59).
+    search_fields = ("nome", "nome_fantasia", "documento", "codigo")
+    readonly_fields = ("codigo_formatado",)
     inlines = [DocumentoCadastralInline]
+
+    @admin.display(description="código")
+    def codigo_formatado(self, obj: Contraparte) -> str:
+        return obj.codigo_formatado
+
+    def get_search_results(self, request, queryset, search_term):
+        """Aceita o código com hífen, do jeito que ele aparece na tela.
+
+        `search_fields` compara o texto cru e o banco guarda o código sem
+        pontuação: sem isto, copiar `K7M4-2QX9-BT5R` da tela e colar aqui não
+        acharia nada (AGENTS.md D59).
+        """
+        if codigo := normalizar_codigo(search_term):
+            return queryset.filter(codigo=codigo), False
+        return super().get_search_results(request, queryset, search_term)
 
 
 class ArquivoDocumentoInline(admin.TabularInline):

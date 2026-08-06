@@ -4,10 +4,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block titulo %}Documentos Arena{% endblock %}</title>
+  {% comment %}
+    O sufixo mora só aqui, e é a forma curta: cada página declara apenas o nome
+    dela. A aba do navegador corta por volta de trinta caracteres, então repetir
+    "Portal de Documentação do FII ARENA" em toda aba esconderia justamente o
+    que distingue uma da outra. O nome por extenso fica no cabeçalho e no login.
+  {% endcomment %}
+  <title>{% block titulo %}Portal de Documentação{% endblock %} | FII ARENA</title>
   <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
   {# Incremente o ?v= ao editar CSS ou JS: sem isso o navegador serve a versão antiga. #}
-  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=13">
+  <link rel="stylesheet" href="{% static 'css/base.css' %}?v=15">
   {# Servido daqui, nunca de CDN: o servidor é privado (AGENTS.md §2). #}
   <script src="{% static 'js/htmx.min.js' %}" defer></script>
   <script src="{% static 'js/formulario.js' %}?v=10" defer></script>
@@ -18,7 +24,13 @@
       <a class="cabecalho__marca" href="{% url 'operacoes:lista' %}">
         {# Decorativo: o nome ao lado já identifica o sistema. #}
         <span class="cabecalho__brasao"><img src="{% static 'img/marca.png' %}" alt="" width="24" height="24"></span>
-        Documentos Arena
+        {% comment %}
+          O prefixo some em tela estreita e sobra "FII ARENA". O nome inteiro tem
+          35 caracteres e divide a barra com até cinco links de navegação, que um
+          administrador vê todos: sem isto, o cabeçalho quebra em duas linhas no
+          notebook. Quem é a casa continua identificado pelo brasão ao lado.
+        {% endcomment %}
+        <span class="cabecalho__nome-longo">Portal de Documentação do </span>FII ARENA
       </a>
       {# A aba atual sai do app da URL resolvida: nenhuma view precisa informá-la. #}
       {% with secao=request.resolver_match.app_name %}

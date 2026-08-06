@@ -57,6 +57,44 @@ def cpf_cnpj(valor) -> str:
     return digitos or "-"
 
 
+#: Espaço que não quebra linha. Caractere de verdade, não entidade HTML: assim o
+#: Django não o escapa. Escrito pelo nome Unicode, e não colado literalmente no
+#: fonte, porque um U+00A0 cru é invisível para quem lê o código e um editor o
+#: troca por espaço comum sem ninguém notar.
+ESPACO_FIXO = "\N{NO-BREAK SPACE}"
+
+
+@register.filter
+def moeda_sem_quebra(texto) -> str:
+    """Cola o `R$` ao número em **texto livre**, para a linha não quebrar entre os dois.
+
+    Serve para o que vem do banco e não passa pelo filtro `moeda`, como o critério
+    do enquadramento ("Evento até R$ 5.000,00"). Em coluna estreita a quebra caía
+    entre o símbolo e o valor e o resultado parecia defeito de renderização.
+
+    O texto continua quebrando **entre palavras**, que é o certo: o que não se
+    parte é só o par símbolo e número.
+
+    Não é o `moeda` que muda, e é de propósito: `solicitacoes/campos.py` faz
+    `removeprefix("R$ ")` na saída dele para preencher o campo de texto, e trocar
+    aquele espaço por um fixo deixaria o prefixo sobrando dentro do input.
+    """
+    return str(texto or "").replace("R$ ", f"R${ESPACO_FIXO}")
+
+
+@register.filter
+def codigo_contraparte(valor) -> str:
+    """`K7M42QX9BT5R` vira `K7M4-2QX9-BT5R` (AGENTS.md D59).
+
+    A mesma regra do `cpf_cnpj`: o banco guarda o valor limpo, e a pontuação é
+    assunto de exibição. Delega para `contrapartes.codigo` porque o agrupamento
+    depende do tamanho do código, que é definido lá.
+    """
+    from contrapartes.codigo import formatar_codigo
+
+    return formatar_codigo(str(valor or ""))
+
+
 def _no_fuso_local(valor):
     """Converte para o fuso local quando houver hora; `date` passa direto.
 

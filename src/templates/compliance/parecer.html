@@ -13,6 +13,7 @@
   <h2>Contraparte</h2>
   <dl class="dados">
     <div><dt>CPF/CNPJ</dt><dd>{{ contraparte.documento|cpf_cnpj }}</dd></div>
+    <div><dt>Código</dt><dd>{{ contraparte.codigo|codigo_contraparte }}</dd></div>
     <div><dt>Tipo</dt><dd>{{ contraparte.get_tipo_pessoa_display }}</dd></div>
     {% if contraparte.data_nascimento %}
       <div><dt>Nascimento</dt><dd>{{ contraparte.data_nascimento|data_br }}</dd></div>

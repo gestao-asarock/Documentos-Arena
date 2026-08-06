@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block titulo %}Entrar | Documentos Arena{% endblock %}
+{% block titulo %}Entrar{% endblock %}
 
 {% load static %}
 
@@ -8,8 +8,10 @@
 <div class="login">
   {# Decorativo: o título logo abaixo já diz o que é. #}
   <img class="login__brasao" src="{% static 'img/marca.png' %}" alt="" width="72" height="72">
-  <h1 class="login__titulo">Documentos Arena</h1>
-  <p class="login__subtitulo">ASAROCK Asset Management | FII ARENA</p>
+  {# O cartão tem 340px: o título quebra em duas linhas, e o `&nbsp;` impede que a quebra caia entre "FII" e "ARENA". #}
+  <h1 class="login__titulo">Portal de Documentação do FII&nbsp;ARENA</h1>
+  {# "FII ARENA" saiu daqui: com o novo título, o subtítulo o repetia na linha de baixo. #}
+  <p class="login__subtitulo">ASAROCK Asset Management</p>
 
   {% if form.errors %}
     <p class="aviso aviso--erro">Usuário ou senha inválidos.</p>

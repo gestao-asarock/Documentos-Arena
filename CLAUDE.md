@@ -193,6 +193,23 @@ corpo leva sublinhado, porque sem azul a cor não distingue mais link de texto. 
 está no cabeçalho (pastilha branca, senão o contorno preto some no grafite) e grande na
 tela de login.
 
+**O portal se chama "Portal de Documentação do FII ARENA"**, e o nome tem duas formas. A
+**longa** aparece no cabeçalho, na tela de login e no `site_header` do Admin. A **curta**,
+`FII ARENA`, é sufixo de toda aba do navegador e o `site_title` do Admin: aba corta por
+volta de trinta caracteres, e repetir o nome inteiro em todas esconderia justamente o que
+distingue uma da outra.
+
+> **O sufixo do `<title>` mora só no `base.html`.** Cada página declara em
+> `{% block titulo %}` apenas o nome dela, sem ` | ...`. Antes o sufixo estava repetido em
+> quinze templates, e trocar o nome do portal significava mexer em quinze arquivos. O
+> padrão do bloco é "Portal de Documentação", então template que esqueça o título cai numa
+> aba sensata em vez de numa que começa com barra vertical.
+
+> No cabeçalho, `.cabecalho__nome-longo` some abaixo de 1100px e sobra `FII ARENA`. O nome
+> inteiro tem 35 caracteres e divide a barra com até cinco links, que o administrador vê
+> todos: sem isso o cabeçalho quebra em duas linhas no notebook. O brasão ao lado continua
+> identificando a casa.
+
 > **Realce estrutural é cinza; cor é só estado.** A linha da etapa da vez
 > (`.linha--atual`) usa `--cor-selecao` e faixa grafite, não azul: as cinco cores de estado
 > dizem uma coisa só, e a pastilha da própria linha já diz "em andamento". Pintar a linha
@@ -301,6 +318,33 @@ registro invisível vazaria a existência dele e o link daria 404 (D35).
 > com outro nome trocava o nome de uma contraparte **já validada**, sem confirmação e sem
 > auditoria: era a porta lateral do D47, que bloqueia a edição exatamente nesse caso.
 
+**Contraparte tem código público** (AGENTS.md D59): doze caracteres como `K7M4-2QX9-BT5R`,
+derivados do CPF/CNPJ por **HMAC-SHA256** com a chave `HASH_KEY` do `.env`. Tudo mora em
+`contrapartes/codigo.py` (`gerar_codigo`, `formatar_codigo`, `normalizar_codigo`); o campo
+é `Contraparte.codigo`, `unique` e `editable=False`, recalculado a cada `save()`. A tela usa
+o filtro `codigo_contraparte` de `formatacao.py` para pôr os hífens, e o banco guarda sem.
+
+> **HMAC, não hash puro, e a chave é o motivo.** SHA-256 de um CPF cai numa tabela
+> pré-calculada em segundos, porque só existem ~10^9 CPFs válidos. Com chave secreta, não.
+> E isto **não anonimiza**: dois registros com o mesmo código continuam sendo visivelmente
+> a mesma pessoa. O que se evita é o caminho de volta ao CPF.
+
+> **`HASH_KEY` nunca rotaciona** e é separada da `SECRET_KEY` por isso: aquela pode ser
+> girada quando vaza, esta trocaria o código de todas as contrapartes. Como o valor fica
+> gravado, perder a chave custa só recalcular, não os códigos emitidos. Chave vazia derruba
+> a inicialização de propósito. Gerar: `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+
+> **O código está na contraparte, não no perfil**, porque é função do CPF/CNPJ: dois perfis
+> da mesma pessoa dariam o mesmo valor e nenhum `unique` sobreviveria. Perfil e contrato
+> continuam com o `pk` sequencial, que é número de protocolo. Se um dia o objetivo for **não
+> expor volume de base**, o alvo é outro (id de perfil e contrato) e a solução é UUID
+> aleatório, não hash de CPF.
+
+**Ele também se procura**, nas duas listas e no Admin, com hífen e em minúscula:
+`normalizar_codigo` só devolve algo com o tamanho exato, então CPF (11 dígitos) e CNPJ (14)
+nunca caem na cláusula do código. Exibir identificador que ninguém consegue buscar seria
+meia funcionalidade.
+
 **O administrador tem dois poderes de correção** (AGENTS.md D58), e nenhum deles é fluxo:
 **apagar** registro já cancelado (perfil ou contrato) e **editar** cadastro que o fluxo
 travou, inclusive validado ou cancelado, **sem reiniciar a validação**. A régua está em
@@ -323,7 +367,10 @@ Editar sem revalidar é o **padrão** do administrador, não um descuido: o caso
 corrigir digitação. Quando ele quiser o contrário, a caixa "Reiniciar a validação" no fim
 do formulário faz a confirmação do D47 aparecer normalmente. Ela **não** é campo do
 formulário, então `editar_confirmar.html` a carrega adiante num `hidden` próprio; sem isso
-o segundo POST gravaria sem reiniciar nada. E editar sem revalidar gera evento na trilha
+o segundo POST gravaria sem reiniciar nada. Perfil sem habilitação não tem o que reiniciar
+(só acontece com dado antigo, porque `abrir_habilitacao` roda no cadastro): a view grava a
+alteração e **diz** que nada voltou para a triagem, em vez de responder um sucesso mudo a
+quem marcou a caixa. E editar sem revalidar gera evento na trilha
 com nome e sobrenome, porque documento aprovado passando a atestar dado diferente do que
 foi conferido não pode acontecer calado.
 
